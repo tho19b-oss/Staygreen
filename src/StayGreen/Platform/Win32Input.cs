@@ -26,6 +26,23 @@ namespace StayGreen.Platform
             return ok;
         }
 
+        /// <summary>Drueckt Modifier + Taste und laesst alles wieder los (fuer den Hotkey-Selbsttest).</summary>
+        public bool SendChord(ushort[] modifiers, ushort key)
+        {
+            var inputs = new System.Collections.Generic.List<NativeMethods.INPUT>();
+            foreach (ushort m in modifiers) inputs.Add(KeyInput(m, Scan(m), 0));
+            inputs.Add(KeyInput(key, Scan(key), 0));
+            inputs.Add(KeyInput(key, Scan(key), NativeMethods.KEYEVENTF_KEYUP));
+            for (int i = modifiers.Length - 1; i >= 0; i--)
+                inputs.Add(KeyInput(modifiers[i], Scan(modifiers[i]), NativeMethods.KEYEVENTF_KEYUP));
+            return Send(inputs.ToArray());
+        }
+
+        static ushort Scan(ushort virtualKey)
+        {
+            return (ushort)NativeMethods.MapVirtualKey(virtualKey, NativeMethods.MAPVK_VK_TO_VSC);
+        }
+
         bool SendKey(ushort virtualKey)
         {
             ushort scan = (ushort)NativeMethods.MapVirtualKey(virtualKey, NativeMethods.MAPVK_VK_TO_VSC);

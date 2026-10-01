@@ -45,7 +45,9 @@ jobs:
           $cond = New-Object System.Windows.Automation.PropertyCondition($AE::ProcessIdProperty, $proc.Id)
           $win = $AE::RootElement.FindFirst($scope::Children, $cond)
           if ($null -eq $win) { throw 'Fenster nicht gefunden' }
-          $win.SetFocus()
+          # Fenster nach vorn holen (SetFocus ist fuer Top-Level-Fenster in UI-Automation nicht erlaubt)
+          Add-Type -Namespace Win -Name U -MemberDefinition '[DllImport("user32.dll")] public static extern bool SetForegroundWindow(System.IntPtr h);'
+          [void][Win.U]::SetForegroundWindow([IntPtr]$win.Current.NativeWindowHandle)
           Start-Sleep -Milliseconds 800
 
           function Save-Shot($name) {

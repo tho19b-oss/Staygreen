@@ -292,6 +292,7 @@ namespace StayGreen.Tests
             Assert.Equal(@"D:\sg\my.ini", a.SettingsPath);
             Assert.Equal("en", a.Language);
             Assert.Equal("out.txt", a.SelfTestPath);
+            Assert.False(a.SelfTestInteractive);     // Datei angegeben (CI): kein Fenster
 
             CommandLine b = CommandLine.Parse(new[] { "--settings=C:\\x y\\a.ini", "--lang=DE", "--selftest=r.txt" });
             Assert.Equal("C:\\x y\\a.ini", b.SettingsPath);
@@ -304,6 +305,7 @@ namespace StayGreen.Tests
         {
             CommandLine c = CommandLine.Parse(new[] { "--selftest", "--start" });
             Assert.Equal(CommandLine.DefaultSelfTestPath, c.SelfTestPath);
+            Assert.True(c.SelfTestInteractive);      // vom Nutzer gestartet: Ergebnis im Fenster zeigen
             Assert.True(c.Start);
             Assert.Equal(Path.Combine(Path.GetTempPath(), "staygreen-selftest.txt"), CommandLine.DefaultSelfTestPath);
         }

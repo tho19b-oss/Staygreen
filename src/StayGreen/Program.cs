@@ -22,7 +22,13 @@ namespace StayGreen
             SettingsStore.UseFile(cmd.SettingsPath);
 
             if (cmd.SelfTestPath != null)
-                return SelfTest.Run(cmd.SelfTestPath);
+            {
+                Application.EnableVisualStyles();
+                Application.SetCompatibleTextRenderingDefault(false);
+                int code = SelfTest.Run(cmd.SelfTestPath);
+                if (cmd.SelfTestInteractive) SelfTest.ShowReport(cmd.SelfTestPath, code == 0);
+                return code;
+            }
 
             using (var instance = new SingleInstance())
             {

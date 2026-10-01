@@ -91,6 +91,29 @@ namespace StayGreen.Tests
             Assert.Equal(t0.AddSeconds(40), r.Engine.NextActivityAt);
         }
 
+        [Fact]
+        public void ClockMovedBackwards_ActsImmediatelyInsteadOfWaitingAnHour()
+        {
+            var r = new Rig();
+            DateTime t0 = T.Mon(3, 0, 0);
+            r.Engine.Start(t0, "Test");                 // sendet sofort, naechste Aktion t0 + 30 s
+            DateTime back = t0.AddHours(-1);            // Winterzeit: Die Uhr springt eine Stunde zurueck
+            r.Engine.Tick(back);
+            Assert.Equal(2, r.Input.Sent);
+            Assert.Equal(back.AddSeconds(30), r.Engine.NextActivityAt);
+        }
+
+        [Fact]
+        public void IntervalShortened_TakesEffectImmediately()
+        {
+            var r = new Rig(s => s.IntervalSeconds = 600);
+            DateTime t0 = T.Mon(10);
+            r.Engine.Start(t0, "Test");                 // naechste Aktion erst in 600 s
+            r.Settings.IntervalSeconds = 30;
+            r.Engine.Tick(t0.AddSeconds(1));            // liegt weiter als ein Intervall voraus -> sofort handeln
+            Assert.Equal(2, r.Input.Sent);
+        }
+
         // ---- Intelligenter Modus ----
 
         [Fact]

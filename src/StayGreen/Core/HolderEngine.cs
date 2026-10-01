@@ -135,9 +135,14 @@ namespace StayGreen.Core
 
             ApplyAwake(_settings.KeepAwake);
 
+            int interval = _settings.IntervalSeconds;
+
+            // Uhr zurueckgestellt (Winterzeit, manuelle Korrektur) oder Intervall verkuerzt: Der geplante Zeitpunkt
+            // liegt dann weiter als ein Intervall in der Zukunft. Sofort handeln statt bis zu eine Stunde zu warten.
+            if (_nextActivity > now.AddSeconds(interval + 1)) _nextActivity = now;
+
             if (now < _nextActivity) return;
 
-            int interval = _settings.IntervalSeconds;
             if (_settings.SmartIdle)
             {
                 TimeSpan idle = _input.GetIdleTime();

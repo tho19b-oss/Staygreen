@@ -76,20 +76,20 @@ namespace StayGreen.Platform
     static class Autostart
     {
         const string RunKey = @"Software\Microsoft\Windows\CurrentVersion\Run";
-        const string ValueName = "StayGreen";
+        public const string DefaultValueName = "StayGreen";
 
         public static string ExpectedCommand
         {
             get { return "\"" + Application.ExecutablePath + "\" --autostart"; }
         }
 
-        public static bool IsEnabled()
+        public static bool IsEnabled(string valueName = DefaultValueName)
         {
             if (!PlatformInfo.IsWindows) return false;
             try
             {
                 using (RegistryKey key = Registry.CurrentUser.OpenSubKey(RunKey))
-                    return key != null && key.GetValue(ValueName) != null;
+                    return key != null && key.GetValue(valueName) != null;
             }
             catch
             {
@@ -97,13 +97,13 @@ namespace StayGreen.Platform
             }
         }
 
-        public static string CurrentCommand()
+        public static string CurrentCommand(string valueName = DefaultValueName)
         {
             if (!PlatformInfo.IsWindows) return null;
             try
             {
                 using (RegistryKey key = Registry.CurrentUser.OpenSubKey(RunKey))
-                    return key == null ? null : key.GetValue(ValueName) as string;
+                    return key == null ? null : key.GetValue(valueName) as string;
             }
             catch
             {
@@ -112,7 +112,7 @@ namespace StayGreen.Platform
         }
 
         /// <summary>True, wenn der gewuenschte Zustand erreicht ist (Richtlinien koennen das Schreiben verbieten).</summary>
-        public static bool Set(bool enable)
+        public static bool Set(bool enable, string valueName = DefaultValueName, string command = null)
         {
             if (!PlatformInfo.IsWindows) return !enable;
             try
@@ -120,10 +120,10 @@ namespace StayGreen.Platform
                 using (RegistryKey key = Registry.CurrentUser.CreateSubKey(RunKey))
                 {
                     if (key == null) return false;
-                    if (enable) key.SetValue(ValueName, ExpectedCommand);
-                    else key.DeleteValue(ValueName, false);
+                    if (enable) key.SetValue(valueName, command ?? ExpectedCommand);
+                    else key.DeleteValue(valueName, false);
                 }
-                return IsEnabled() == enable;
+                return IsEnabled(valueName) == enable;
             }
             catch
             {

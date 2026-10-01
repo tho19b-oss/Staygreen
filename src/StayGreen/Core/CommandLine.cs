@@ -23,6 +23,9 @@ namespace StayGreen.Core
         /// <summary>Selbsttest ausfuehren und das Ergebnis in diese Datei schreiben.</summary>
         public string SelfTestPath { get; private set; }
 
+        /// <summary>Selbsttest ohne Dateiangabe (vom Nutzer gestartet): Ergebnis zusaetzlich in einem Fenster zeigen.</summary>
+        public bool SelfTestInteractive { get; private set; }
+
         /// <summary>Andere Einstellungsdatei verwenden (z. B. fuer mehrere Profile oder USB-Stick).</summary>
         public string SettingsPath { get; private set; }
 
@@ -85,7 +88,9 @@ namespace StayGreen.Core
                         result.Help = true;
                         break;
                     case "--selftest":
-                        result.SelfTestPath = value ?? NextValue(args, ref i) ?? DefaultSelfTestPath;
+                        string path = value ?? NextValue(args, ref i);
+                        result.SelfTestInteractive = path == null;
+                        result.SelfTestPath = path ?? DefaultSelfTestPath;
                         break;
                     case "--settings":
                         result.SettingsPath = value ?? NextValue(args, ref i);
