@@ -1,0 +1,19 @@
+# Build
+bin/
+obj/
+*.user
+*.suo
+.vs/
+.idea/
+
+# Testergebnisse
+TestResults/
+*.trx
+
+# Auslieferung (wird von der CI erzeugt)
+dist/
+
+# Lokale Einstellungen/Protokolle beim Entwickeln
+settings.ini
+*.tmp
+error.log

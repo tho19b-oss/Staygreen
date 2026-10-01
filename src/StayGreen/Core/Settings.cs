@@ -1,0 +1,310 @@
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.Text;
+
+namespace StayGreen.Core
+{
+    /// <summary>Wie Aktivitaet erzeugt wird.</summary>
+    public enum ActivityMode
+    {
+        /// <summary>Unauffaelliger Tastendruck (F15, existiert auf keiner Tastatur).</summary>
+        Key,
+
+        /// <summary>Winzige Mausbewegung hin und sofort zurueck.</summary>
+        Mouse,
+
+        /// <summary>Taste und Maus.</summary>
+        Both,
+    }
+
+    public enum StopTiming
+    {
+        /// <summary>Jeden Tag zur gleichen Uhrzeit.</summary>
+        Daily,
+
+        /// <summary>Einmalig zu einem bestimmten Datum und einer Uhrzeit.</summary>
+        Once,
+    }
+
+    /// <summary>
+    /// Alle Einstellungen. Gespeichert als einfache, von Hand editierbare Textdatei (Schluessel=Wert),
+    /// bewusst ohne JSON-Bibliothek, damit die EXE eine einzelne Datei ohne Abhaengigkeiten bleibt.
+    /// </summary>
+    public sealed class Settings
+    {
+        public const int MinInterval = 5;
+        public const int MaxInterval = 600;
+        public const int MinMousePixels = 1;
+        public const int MaxMousePixels = 20;
+
+        /// <summary>Tasten, die als globaler Hotkey erlaubt sind.</summary>
+        public static readonly string[] HotkeyKeys =
+        {
+            "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M",
+            "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z",
+            "F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10", "F11", "F12",
+        };
+
+        // ---- Aktivitaet ----
+        public ActivityMode Mode { get; set; } = ActivityMode.Both;
+        public int IntervalSeconds { get; set; } = 30;
+        public int MousePixels { get; set; } = 2;
+
+        /// <summary>Nur eingreifen, wenn der Nutzer selbst gerade nichts tut.</summary>
+        public bool SmartIdle { get; set; } = true;
+
+        /// <summary>PC und Bildschirm wach halten (kein Standby, kein Bildschirmschoner).</summary>
+        public bool KeepAwake { get; set; } = true;
+
+        // ---- Start und Fenster ----
+        public bool StartHoldingOnLaunch { get; set; } = true;
+        public bool StartWithWindows { get; set; }
+        public bool StartMinimized { get; set; }
+        public bool MinimizeToTray { get; set; } = true;
+
+        /// <summary>auto, de oder en.</summary>
+        public string Language { get; set; } = "auto";
+
+        // ---- Hotkey ----
+        public bool HotkeyEnabled { get; set; } = true;
+        public bool HotkeyCtrl { get; set; } = true;
+        public bool HotkeyAlt { get; set; } = true;
+        public bool HotkeyShift { get; set; }
+        public bool HotkeyWin { get; set; }
+        public string HotkeyKey { get; set; } = "G";
+
+        // ---- Zeitplan ----
+        public bool ScheduleEnabled { get; set; }
+        public List<ScheduleRule> Rules { get; } = new List<ScheduleRule>();
+
+        // ---- Auto-Stopp ----
+        public bool AutoStopEnabled { get; set; }
+        public StopTiming AutoStopTiming { get; set; } = StopTiming.Daily;
+        public TimeSpan AutoStopTime { get; set; } = new TimeSpan(17, 0, 0);
+        public DateTime AutoStopOnce { get; set; } = DateTime.MinValue;
+        public bool StopCloseTeams { get; set; }
+        public bool StopLock { get; set; }
+        public bool StopShutdown { get; set; }
+        public bool StopExitApp { get; set; } = true;
+
+        // ---- Protokoll ----
+        public bool LogEnabled { get; set; }
+
+        /// <summary>Leer = Standardpfad (neben den Einstellungen).</summary>
+        public string LogPath { get; set; } = "";
+
+        /// <summary>Zeitplan an und mindestens ein brauchbares Fenster vorhanden.</summary>
+        public bool ScheduleActive
+        {
+            get
+            {
+                if (!ScheduleEnabled) return false;
+                foreach (ScheduleRule rule in Rules)
+                    if (rule.IsUsable) return true;
+                return false;
+            }
+        }
+
+        public bool HasStopActions
+        {
+            get { return StopCloseTeams || StopLock || StopShutdown || StopExitApp; }
+        }
+
+        /// <summary>Bringt alle Werte in den erlaubten Bereich (nach dem Laden und nach Benutzereingaben).</summary>
+        public void Normalize()
+        {
+            IntervalSeconds = Clamp(IntervalSeconds, MinInterval, MaxInterval);
+            MousePixels = Clamp(MousePixels, MinMousePixels, MaxMousePixels);
+
+            if (Language != "de" && Language != "en") Language = "auto";
+
+            string key = (HotkeyKey ?? "").Trim().ToUpperInvariant();
+            HotkeyKey = Array.IndexOf(HotkeyKeys, key) >= 0 ? key : "G";
+            // Ein globaler Hotkey ganz ohne Modifier wuerde eine normale Taste im ganzen System kapern.
+            if (!HotkeyCtrl && !HotkeyAlt && !HotkeyShift && !HotkeyWin)
+            {
+                HotkeyCtrl = true;
+                HotkeyAlt = true;
+            }
+
+            if (AutoStopTime < TimeSpan.Zero || AutoStopTime >= TimeSpan.FromHours(24))
+                AutoStopTime = new TimeSpan(17, 0, 0);
+
+            Rules.RemoveAll(r => r == null || !r.IsUsable);
+            LogPath = (LogPath ?? "").Trim();
+        }
+
+        static int Clamp(int value, int min, int max)
+        {
+            return value < min ? min : (value > max ? max : value);
+        }
+
+        // ------------------------------------------------------------------ Datei-Format
+
+        public string Serialize()
+        {
+            var sb = new StringBuilder();
+            Line(sb, "; StayGreen-Einstellungen. Nur bei geschlossenem Programm von Hand aendern.");
+            Line(sb, "Version=1");
+            Add(sb, "Language", Language);
+            Add(sb, "Mode", Mode.ToString());
+            Add(sb, "IntervalSeconds", IntervalSeconds);
+            Add(sb, "MousePixels", MousePixels);
+            Add(sb, "SmartIdle", SmartIdle);
+            Add(sb, "KeepAwake", KeepAwake);
+
+            Add(sb, "StartHoldingOnLaunch", StartHoldingOnLaunch);
+            Add(sb, "StartWithWindows", StartWithWindows);
+            Add(sb, "StartMinimized", StartMinimized);
+            Add(sb, "MinimizeToTray", MinimizeToTray);
+
+            Add(sb, "HotkeyEnabled", HotkeyEnabled);
+            Add(sb, "HotkeyCtrl", HotkeyCtrl);
+            Add(sb, "HotkeyAlt", HotkeyAlt);
+            Add(sb, "HotkeyShift", HotkeyShift);
+            Add(sb, "HotkeyWin", HotkeyWin);
+            Add(sb, "HotkeyKey", HotkeyKey);
+
+            Add(sb, "ScheduleEnabled", ScheduleEnabled);
+            foreach (ScheduleRule rule in Rules)
+                Add(sb, "Rule", rule.Serialize());
+
+            Add(sb, "AutoStopEnabled", AutoStopEnabled);
+            Add(sb, "AutoStopTiming", AutoStopTiming.ToString());
+            Add(sb, "AutoStopTime", ScheduleRule.FormatTime(AutoStopTime));
+            Add(sb, "AutoStopOnce", AutoStopOnce == DateTime.MinValue
+                ? ""
+                : AutoStopOnce.ToString("yyyy-MM-dd'T'HH:mm:ss", CultureInfo.InvariantCulture));
+            Add(sb, "StopCloseTeams", StopCloseTeams);
+            Add(sb, "StopLock", StopLock);
+            Add(sb, "StopShutdown", StopShutdown);
+            Add(sb, "StopExitApp", StopExitApp);
+
+            Add(sb, "LogEnabled", LogEnabled);
+            Add(sb, "LogPath", LogPath);
+            return sb.ToString();
+        }
+
+        /// <summary>Liest Einstellungen tolerant: unbekannte Schluessel und kaputte Werte werden ignoriert.</summary>
+        public static Settings Parse(string text)
+        {
+            var s = new Settings();
+            if (!string.IsNullOrEmpty(text))
+            {
+                foreach (string raw in text.Split('\n'))
+                {
+                    string line = raw.Trim();
+                    if (line.Length == 0 || line[0] == ';' || line[0] == '#') continue;
+                    int eq = line.IndexOf('=');
+                    if (eq <= 0) continue;
+                    s.Apply(line.Substring(0, eq).Trim().ToLowerInvariant(), line.Substring(eq + 1).Trim());
+                }
+            }
+            s.Normalize();
+            return s;
+        }
+
+        void Apply(string key, string value)
+        {
+            bool b;
+            int i;
+            switch (key)
+            {
+                case "language": Language = value.ToLowerInvariant(); break;
+                case "mode":
+                    ActivityMode mode;
+                    if (TryEnum(value, out mode)) Mode = mode;
+                    break;
+                case "intervalseconds": if (TryInt(value, out i)) IntervalSeconds = i; break;
+                case "mousepixels": if (TryInt(value, out i)) MousePixels = i; break;
+                case "smartidle": if (TryBool(value, out b)) SmartIdle = b; break;
+                case "keepawake": if (TryBool(value, out b)) KeepAwake = b; break;
+
+                case "startholdingonlaunch": if (TryBool(value, out b)) StartHoldingOnLaunch = b; break;
+                case "startwithwindows": if (TryBool(value, out b)) StartWithWindows = b; break;
+                case "startminimized": if (TryBool(value, out b)) StartMinimized = b; break;
+                case "minimizetotray": if (TryBool(value, out b)) MinimizeToTray = b; break;
+
+                case "hotkeyenabled": if (TryBool(value, out b)) HotkeyEnabled = b; break;
+                case "hotkeyctrl": if (TryBool(value, out b)) HotkeyCtrl = b; break;
+                case "hotkeyalt": if (TryBool(value, out b)) HotkeyAlt = b; break;
+                case "hotkeyshift": if (TryBool(value, out b)) HotkeyShift = b; break;
+                case "hotkeywin": if (TryBool(value, out b)) HotkeyWin = b; break;
+                case "hotkeykey": HotkeyKey = value; break;
+
+                case "scheduleenabled": if (TryBool(value, out b)) ScheduleEnabled = b; break;
+                case "rule":
+                    ScheduleRule rule;
+                    if (ScheduleRule.TryParse(value, out rule)) Rules.Add(rule);
+                    break;
+
+                case "autostopenabled": if (TryBool(value, out b)) AutoStopEnabled = b; break;
+                case "autostoptiming":
+                    StopTiming timing;
+                    if (TryEnum(value, out timing)) AutoStopTiming = timing;
+                    break;
+                case "autostoptime":
+                    TimeSpan time;
+                    if (ScheduleRule.TryParseTime(value, out time)) AutoStopTime = time;
+                    break;
+                case "autostoponce":
+                    DateTime once;
+                    if (DateTime.TryParseExact(value, "yyyy-MM-dd'T'HH:mm:ss", CultureInfo.InvariantCulture,
+                            DateTimeStyles.None, out once))
+                        AutoStopOnce = once;
+                    break;
+                case "stopcloseteams": if (TryBool(value, out b)) StopCloseTeams = b; break;
+                case "stoplock": if (TryBool(value, out b)) StopLock = b; break;
+                case "stopshutdown": if (TryBool(value, out b)) StopShutdown = b; break;
+                case "stopexitapp": if (TryBool(value, out b)) StopExitApp = b; break;
+
+                case "logenabled": if (TryBool(value, out b)) LogEnabled = b; break;
+                case "logpath": LogPath = value; break;
+            }
+        }
+
+        static bool TryBool(string value, out bool result)
+        {
+            string v = value.Trim().ToLowerInvariant();
+            if (v == "true" || v == "1" || v == "yes" || v == "ja") { result = true; return true; }
+            if (v == "false" || v == "0" || v == "no" || v == "nein") { result = false; return true; }
+            result = false;
+            return false;
+        }
+
+        static bool TryInt(string value, out int result)
+        {
+            return int.TryParse(value.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out result);
+        }
+
+        static bool TryEnum<T>(string value, out T result) where T : struct
+        {
+            // Enum.TryParse akzeptiert auch Zahlen ("7"); nur echte Namen zulassen.
+            result = default(T);
+            string v = value.Trim();
+            if (v.Length == 0 || char.IsDigit(v[0]) || v[0] == '-') return false;
+            return Enum.TryParse(v, true, out result) && Enum.IsDefined(typeof(T), result);
+        }
+
+        static void Line(StringBuilder sb, string text)
+        {
+            sb.Append(text).Append("\r\n");
+        }
+
+        static void Add(StringBuilder sb, string key, string value)
+        {
+            Line(sb, key + "=" + value);
+        }
+
+        static void Add(StringBuilder sb, string key, int value)
+        {
+            Add(sb, key, value.ToString(CultureInfo.InvariantCulture));
+        }
+
+        static void Add(StringBuilder sb, string key, bool value)
+        {
+            Add(sb, key, value ? "true" : "false");
+        }
+    }
+}
