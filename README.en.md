@@ -14,6 +14,14 @@ A tiny Windows app: **one single file** (`StayGreen.exe`, about 140 KB), **no in
 2. If Windows shows "Windows protected your PC" (SmartScreen): **More info → Run anyway**. The EXE is not code-signed, so Windows asks for every new, unknown file. Alternatively right-click the file → *Properties* → tick **Unblock** → *OK* beforehand.
 3. Done. StayGreen starts right away, the lamp at the top of the window turns green and your status stays green. Click **Stop** to end it.
 
+## What it looks like
+
+<p align="center">
+  <img src="docs/images/en-1-activity.png" width="330" alt="StayGreen, Activity tab">
+</p>
+
+*Captured on Windows 11. The lamp at the top shows the state: green = active, amber = waiting for the time window, red = input is being rejected, grey = stopped.*
+
 ## Features
 
 | Feature | Description |
@@ -34,7 +42,7 @@ A tiny Windows app: **one single file** (`StayGreen.exe`, about 140 KB), **no in
 | **Single instance** | A second start brings the existing window to the front. |
 | **Command line** | `--start`, `--no-start`, `--minimized`, `--tab <name>`, `--settings <file>`, `--lang de\|en`, `--selftest`, `--help`. |
 
-Works with Microsoft Teams (new and classic), Skype for Business, Slack, Zoom, Webex and anything that evaluates the Windows idle time.
+Meant for Microsoft Teams (new and classic). The principle works with any program that evaluates the Windows idle time, for example Skype for Business, Slack, Zoom or Webex.
 
 ## How does it work?
 
@@ -45,11 +53,11 @@ Teams sets you to "Away" after about five minutes without keyboard or mouse acti
 - **Locked PC (Win+L):** Teams always shows "Away" while the PC is locked. No software can change that. StayGreen only prevents *automatic* locking due to inactivity.
 - **Teams in the browser:** The browser tab has to be in the foreground, otherwise the input does not count there.
 - **Calendar and calls:** States such as "In a meeting", "In a call" or "Do not disturb" come from Teams itself and stay untouched.
-- **Windows only** (10 and 11, also Windows 7/8.1 with .NET Framework 4.7.2).
+- **Windows only.** Developed and automatically tested for Windows 10 and 11. Older versions with .NET Framework 4.7.2 should work but are untested.
 
 ## Troubleshooting
 
-**Does anything arrive at all?** Start `StayGreen.exe --selftest` (e.g. via a shortcut with that addition). StayGreen then checks on your computer whether Windows accepts key presses and mouse movements and resets the idle counter, whether the hotkey fires and whether autostart is writable, and shows the result in a window. The test does not create anything permanent.
+**Does anything arrive at all?** Start `StayGreen.exe --selftest` (e.g. via a shortcut with that addition). StayGreen then checks on your computer whether Windows accepts key presses and mouse movements and resets the idle counter, whether the hotkey fires and whether autostart is writable, and shows the result in a window. The test only writes a result file to the temp folder and removes its short-lived test autostart entry again immediately.
 
 **The status still turns to "Away".** On the *Activity* tab click **Test now**. If StayGreen reports success, the input reaches Windows. Then the method **Key and mouse**, a shorter interval (30 s) or switching off smart mode usually helps. If the status card says "Input is being rejected", Windows blocks the input (locked session, disconnected remote session or security software).
 
@@ -81,6 +89,8 @@ dotnet build src/StayGreen/StayGreen.csproj -c Release        # produces bin/Rel
 ```
 
 The EXE targets **.NET Framework 4.7.2**, which is built into Windows 10 (1803+) and Windows 11. That is why it needs no runtime installation and stays a single file.
+
+**Update screenshots:** *Actions → Screenshots → Run workflow* with *commit* ticked. The workflow starts the EXE on Windows and stores the images under `docs/images/`.
 
 **Publish a release:** in GitHub go to *Actions → CI → Run workflow* and tick *release* (or push a tag such as `v1.0.0`). The version lives in `src/StayGreen/StayGreen.csproj` (`<Version>`).
 

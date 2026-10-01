@@ -2,16 +2,12 @@ name: Screenshots
 
 # Manuell auszufuehren: startet die EXE auf einem echten Windows in mehreren Zustaenden und legt Bilder des Fensters
 # ab (Artefakt "StayGreen-screenshots"). Mit "commit" werden sie ausserdem nach docs/images/ eingecheckt (fuer die
-# README); mit "print_base64" zusaetzlich als Text ins Protokoll geschrieben.
+# README).
 on:
   workflow_dispatch:
     inputs:
       commit:
         description: 'Bilder nach docs/images/ einchecken'
-        type: boolean
-        default: false
-      print_base64:
-        description: 'Bilder zusaetzlich als Base64 ins Protokoll schreiben'
         type: boolean
         default: false
 
@@ -90,15 +86,6 @@ jobs:
           Take-Shot 'en-1-activity' 'en' $null @() $base
 
           Get-ChildItem shots | ForEach-Object { "{0}  {1} Byte" -f $_.Name, $_.Length }
-
-          if ('${{ inputs.print_base64 }}' -eq 'true') {
-            Get-ChildItem shots\*.png | ForEach-Object {
-              "<<<PNG $($_.Name)"
-              $b64 = [Convert]::ToBase64String([IO.File]::ReadAllBytes($_.FullName))
-              for ($k = 0; $k -lt $b64.Length; $k += 230) { $b64.Substring($k, [Math]::Min(230, $b64.Length - $k)) }
-              ">>>"
-            }
-          }
       - uses: actions/upload-artifact@v5
         with:
           name: StayGreen-screenshots

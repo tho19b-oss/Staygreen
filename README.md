@@ -18,6 +18,19 @@ Beim ersten Mal lohnt ein Blick auf die Registerkarte **System**: Dort stellst d
 
 > Windows 11 versteckt neue Symbole im Infobereich hinter dem Pfeil `^`. Ziehe das StayGreen-Symbol heraus, wenn du es dauerhaft sehen willst.
 
+## So sieht es aus
+
+<p align="center">
+  <img src="docs/images/de-1-aktivitaet.png" width="330" alt="StayGreen, Karte Aktivität">
+  <img src="docs/images/de-2-zeitplan.png" width="330" alt="StayGreen, Karte Zeitplan (wartet auf das nächste Zeitfenster)">
+</p>
+<p align="center">
+  <img src="docs/images/de-3-autostopp.png" width="330" alt="StayGreen, Karte Auto-Stopp">
+  <img src="docs/images/de-4-system.png" width="330" alt="StayGreen, Karte System">
+</p>
+
+*Aufnahmen auf Windows 11. Die Lampe oben zeigt den Zustand: grün = aktiv, gelb = wartet auf das Zeitfenster, rot = Eingaben werden abgelehnt, grau = gestoppt.*
+
 ## Funktionen
 
 | Funktion | Beschreibung |
@@ -38,7 +51,7 @@ Beim ersten Mal lohnt ein Blick auf die Registerkarte **System**: Dort stellst d
 | **Einzelinstanz** | Ein zweiter Start holt das vorhandene Fenster nach vorn. |
 | **Kommandozeile** | `--start`, `--no-start`, `--minimized`, `--tab <Name>`, `--settings <Datei>`, `--lang de\|en`, `--selftest`, `--help`. |
 
-Funktioniert mit Microsoft Teams (neu und klassisch), Skype for Business, Slack, Zoom, Webex und allem, was die Leerlaufzeit von Windows auswertet.
+Gedacht für Microsoft Teams (neu und klassisch). Das Prinzip greift bei allen Programmen, die die Leerlaufzeit von Windows auswerten, zum Beispiel Skype for Business, Slack, Zoom oder Webex.
 
 ## Wie funktioniert das?
 
@@ -49,12 +62,12 @@ Teams setzt dich nach etwa fünf Minuten ohne Tastatur- und Mausaktivität auf �
 - **Gesperrter PC (Win+L):** Beim Sperren zeigt Teams immer „Abwesend“. Dagegen hilft keine Software. StayGreen verhindert nur das *automatische* Sperren durch Inaktivität.
 - **Teams im Browser:** Der Browser-Tab muss im Vordergrund sein, sonst zählt die Eingabe dort nicht.
 - **Kalender und Anrufe:** Zustände wie „In einer Besprechung“, „Im Anruf“ oder „Nicht stören“ kommen von Teams selbst und bleiben unberührt.
-- **Nur Windows** (10 und 11, auch Windows 7/8.1 mit .NET Framework 4.7.2).
+- **Nur Windows.** Entwickelt und automatisch getestet für Windows 10 und 11. Ältere Versionen mit .NET Framework 4.7.2 sollten laufen, sind aber nicht getestet.
 
 ## Fehlersuche
 
 **Kommt überhaupt etwas an?**
-`StayGreen.exe --selftest` starten (z. B. über eine Verknüpfung mit diesem Zusatz). StayGreen prüft dann auf deinem Rechner, ob Windows Tastendruck und Mausbewegung annimmt und den Leerlaufzähler zurücksetzt, ob der Hotkey auslöst und ob der Autostart schreibbar ist, und zeigt das Ergebnis in einem Fenster. Der Test legt nichts dauerhaft an.
+`StayGreen.exe --selftest` starten (z. B. über eine Verknüpfung mit diesem Zusatz). StayGreen prüft dann auf deinem Rechner, ob Windows Tastendruck und Mausbewegung annimmt und den Leerlaufzähler zurücksetzt, ob der Hotkey auslöst und ob der Autostart schreibbar ist, und zeigt das Ergebnis in einem Fenster. Der Test schreibt nur eine Ergebnisdatei in den Temp-Ordner und entfernt seinen kurzzeitigen Test-Eintrag im Autostart sofort wieder.
 
 **Der Status wird trotzdem „Abwesend“.**
 Auf der Karte *Aktivität* auf **Jetzt testen** klicken. Meldet StayGreen Erfolg, kommt die Eingabe bei Windows an. Dann hilft meist die Methode **Taste und Maus**, ein kürzeres Intervall (30 s) oder das Abschalten des intelligenten Modus. Zeigt die Statuskarte „Eingaben werden abgelehnt“, blockiert Windows die Eingabe (gesperrte Sitzung, getrennte Remote-Sitzung oder Sicherheitssoftware).
@@ -100,6 +113,8 @@ tests/        xUnit-Tests (laufen auf Linux und Windows)
 tools/        make_icon.py erzeugt das Icon ohne Fremdabhängigkeiten
 .github/      CI: Tests, Windows-Build, Selbsttest, Start-Test, Release
 ```
+
+**Screenshots aktualisieren:** *Actions → Screenshots → Run workflow* mit Haken bei *commit*. Der Workflow startet die EXE auf Windows und legt die Bilder unter `docs/images/` ab.
 
 **Release veröffentlichen:** In GitHub unter *Actions → CI → Run workflow* die Option *Release* anhaken (oder ein Tag `v1.0.0` pushen). Die Version steht in `src/StayGreen/StayGreen.csproj` (`<Version>`).
 
