@@ -125,12 +125,14 @@ jobs:
           {
             echo "## StayGreen ${VERSION}"
             echo
-            echo "**Download:** \`StayGreen.exe\` anklicken (eine einzelne Datei, keine Installation, keine Administratorrechte)."
-            echo "Alternativ \`StayGreen-portable.zip\`: EXE plus Marker-Datei, damit Einstellungen neben der EXE liegen (z. B. USB-Stick)."
+            echo "**Download:** \`StayGreen.exe\` anklicken. Eine einzelne Datei, keine Installation, keine Administratorrechte."
+            echo "Alternativ \`StayGreen-portable.zip\`: EXE plus Marker-Datei, damit die Einstellungen neben der EXE liegen (z. B. USB-Stick)."
             echo
-            echo "**Download:** click \`StayGreen.exe\` (single file, no installation, no admin rights needed)."
+            echo "**Download:** click \`StayGreen.exe\`. Single file, no installation, no administrator rights."
+            echo "Alternatively \`StayGreen-portable.zip\`: EXE plus marker file so the settings live next to the EXE (e.g. USB stick)."
             echo
-            echo "Beim ersten Start zeigt Windows evtl. die SmartScreen-Warnung (die EXE ist nicht signiert): *Weitere Informationen* → *Trotzdem ausfuehren*."
+            echo "Beim ersten Start zeigt Windows eventuell die SmartScreen-Warnung, weil die EXE nicht signiert ist: *Weitere Informationen* → *Trotzdem ausführen*."
+            echo "On first start Windows may show a SmartScreen warning because the EXE is unsigned: *More info* → *Run anyway*."
             echo
             echo "### SHA256"
             echo '```'
@@ -139,6 +141,7 @@ jobs:
           } > RELEASE_NOTES.md
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" dist/StayGreen.exe dist/StayGreen-portable.zip dist/SHA256SUMS.txt --clobber
+            gh release edit "$TAG" --notes-file RELEASE_NOTES.md
           else
             gh release create "$TAG" dist/StayGreen.exe dist/StayGreen-portable.zip dist/SHA256SUMS.txt \
               --target "$GITHUB_SHA" --title "StayGreen ${VERSION}" --notes-file RELEASE_NOTES.md

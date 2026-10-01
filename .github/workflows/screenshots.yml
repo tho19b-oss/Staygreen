@@ -81,7 +81,7 @@ jobs:
           Take-Shot 'de-1-aktivitaet' 'de' $null @() $base
           Take-Shot 'de-2-zeitplan' 'de' 'schedule' @() ($base + @('ScheduleEnabled=true', 'Rule=1111100;08:00;12:00', 'Rule=1111100;13:00;17:00'))
           Take-Shot 'de-3-autostopp' 'de' 'stop' @() ($base + @('AutoStopEnabled=true', 'AutoStopTiming=Daily', 'AutoStopTime=17:00', 'StopCloseTeams=true', 'StopLock=true', 'StopExitApp=true'))
-          Take-Shot 'de-4-system' 'de' 'system' @() ($base + @('LogEnabled=true'))
+          Take-Shot 'de-4-system' 'de' 'system' @() ($base + @('LogEnabled=true', 'LogPath=C:\Users\Anna\Dokumente\StayGreen-Protokoll.txt'))
           Take-Shot 'de-5-gestoppt' 'de' $null @('--no-start') $base
           Take-Shot 'en-1-activity' 'en' $null @() $base
 
