@@ -1,0 +1,97 @@
+name: Screenshots
+
+# Manuell auszufuehren: startet die EXE auf einem echten Windows, schaltet per UI-Automation durch die
+# Registerkarten und legt Bilder ab (Artefakt "StayGreen-screenshots"). Mit "print_base64" werden sie zusaetzlich
+# als Text ins Protokoll geschrieben.
+on:
+  workflow_dispatch:
+    inputs:
+      print_base64:
+        description: 'Bilder zusaetzlich als Base64 ins Protokoll schreiben'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  shots:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 8.0.x
+      - name: Build
+        run: dotnet build src/StayGreen/StayGreen.csproj -c Release --nologo
+      - name: Screenshots
+        shell: powershell
+        run: |
+          Add-Type -AssemblyName System.Windows.Forms, System.Drawing, UIAutomationClient, UIAutomationTypes
+          $AE = [System.Windows.Automation.AutomationElement]
+          $scope = [System.Windows.Automation.TreeScope]
+
+          $exe = Join-Path $PWD 'src\StayGreen\bin\Release\net472\StayGreen.exe'
+          $ini = Join-Path $env:RUNNER_TEMP 'shots.ini'
+          @('StartHoldingOnLaunch=true', 'SmartIdle=false') | Set-Content -Path $ini -Encoding ASCII
+          New-Item -ItemType Directory -Force -Path shots | Out-Null
+
+          $screen = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+          "Bildschirm: $($screen.Width)x$($screen.Height)"
+
+          $proc = Start-Process -FilePath $exe -ArgumentList @('--settings', $ini, '--lang', 'de') -PassThru
+          Start-Sleep -Seconds 5
+
+          $cond = New-Object System.Windows.Automation.PropertyCondition($AE::ProcessIdProperty, $proc.Id)
+          $win = $AE::RootElement.FindFirst($scope::Children, $cond)
+          if ($null -eq $win) { throw 'Fenster nicht gefunden' }
+          $win.SetFocus()
+          Start-Sleep -Milliseconds 800
+
+          function Save-Shot($name) {
+            $r = $win.Current.BoundingRectangle
+            "{0}: Fenster {1},{2} {3}x{4}" -f $name, [int]$r.X, [int]$r.Y, [int]$r.Width, [int]$r.Height
+            $bmp = New-Object System.Drawing.Bitmap ([int]$r.Width), ([int]$r.Height)
+            $g = [System.Drawing.Graphics]::FromImage($bmp)
+            $g.CopyFromScreen([int]$r.X, [int]$r.Y, 0, 0, $bmp.Size)
+            $bmp.Save((Join-Path 'shots' "$name.png"), [System.Drawing.Imaging.ImageFormat]::Png)
+            $g.Dispose(); $bmp.Dispose()
+          }
+
+          $tabCond = New-Object System.Windows.Automation.PropertyCondition($AE::ControlTypeProperty, [System.Windows.Automation.ControlType]::TabItem)
+          $tabs = $win.FindAll($scope::Descendants, $tabCond)
+          "Registerkarten gefunden: $($tabs.Count)"
+          $i = 1
+          foreach ($t in $tabs) {
+            $t.GetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern).Select()
+            Start-Sleep -Milliseconds 1500
+            Save-Shot ('{0}-{1}' -f $i, ($t.Current.Name -replace '[^A-Za-z0-9]', ''))
+            $i++
+          }
+
+          # Zustand "Gestoppt": Knopf "Stoppen" ausloesen
+          $btnCond = New-Object System.Windows.Automation.PropertyCondition($AE::ControlTypeProperty, [System.Windows.Automation.ControlType]::Button)
+          $stop = $null
+          foreach ($b in $win.FindAll($scope::Descendants, $btnCond)) { if ($b.Current.Name -eq 'Stoppen') { $stop = $b } }
+          if ($stop) {
+            $stop.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()
+            Start-Sleep -Milliseconds 1500
+            Save-Shot '9-Gestoppt'
+          } else { Write-Warning 'Knopf Stoppen nicht gefunden' }
+
+          Stop-Process -Id $proc.Id -Force
+          Get-ChildItem shots | ForEach-Object { "{0}  {1} Byte" -f $_.Name, $_.Length }
+
+          if ('${{ inputs.print_base64 }}' -eq 'true') {
+            Get-ChildItem shots\*.png | ForEach-Object {
+              "<<<PNG $($_.Name)"
+              $b64 = [Convert]::ToBase64String([IO.File]::ReadAllBytes($_.FullName))
+              for ($k = 0; $k -lt $b64.Length; $k += 230) { $b64.Substring($k, [Math]::Min(230, $b64.Length - $k)) }
+              ">>>"
+            }
+          }
+      - uses: actions/upload-artifact@v5
+        with:
+          name: StayGreen-screenshots
+          path: shots/*.png
+          if-no-files-found: error

@@ -72,7 +72,7 @@ namespace StayGreen.UI
             FormBorderStyle = FormBorderStyle.Sizable;
             MaximizeBox = false;
             ClientSize = new Size(500, 640);
-            MinimumSize = new Size(Dpi.Px(480), Dpi.Px(520));
+            MinimumSize = new Size(480, 520); // logische Pixel: AutoScaleMode.Dpi skaliert das selbst
             Icon = _app.WindowIcon;
 
             BuildHeader();
@@ -264,6 +264,20 @@ namespace StayGreen.UI
             if (WindowState == FormWindowState.Minimized) _app.OnMainWindowMinimized();
         }
 
+        // Die DPI-Skalierung laeuft waehrend des ersten Anzeigens; danach die Statuskarte sicher neu anordnen,
+        // auch wenn sich ihre Texte (z. B. im Zustand "Gestoppt") nicht mehr aendern.
+        protected override void OnLoad(EventArgs e)
+        {
+            base.OnLoad(e);
+            LayoutHeader();
+        }
+
+        protected override void OnShown(EventArgs e)
+        {
+            base.OnShown(e);
+            LayoutHeader();
+        }
+
         protected override void OnFormClosing(FormClosingEventArgs e)
         {
             if (e.CloseReason == CloseReason.UserClosing && !_app.IsExiting)
@@ -273,6 +287,11 @@ namespace StayGreen.UI
                     e.Cancel = true;
                     return;
                 }
+            }
+            else if (e.CloseReason == CloseReason.WindowsShutDown || e.CloseReason == CloseReason.TaskManagerClosing)
+            {
+                // Abmelden/Herunterfahren: Ende im Protokoll festhalten und Wach-Halten freigeben.
+                _app.ExitApp();
             }
             base.OnFormClosing(e);
         }
