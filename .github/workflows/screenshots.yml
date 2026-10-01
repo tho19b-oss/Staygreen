@@ -42,9 +42,16 @@ jobs:
           $proc = Start-Process -FilePath $exe -ArgumentList @('--settings', $ini, '--lang', 'de') -PassThru
           Start-Sleep -Seconds 5
 
-          $cond = New-Object System.Windows.Automation.PropertyCondition($AE::ProcessIdProperty, $proc.Id)
-          $win = $AE::RootElement.FindFirst($scope::Children, $cond)
-          if ($null -eq $win) { throw 'Fenster nicht gefunden' }
+          # Alle Top-Level-Fenster des Prozesses auflisten (Diagnose) und das Hauptfenster ueber den Titel waehlen.
+          $pidCond = New-Object System.Windows.Automation.PropertyCondition($AE::ProcessIdProperty, $proc.Id)
+          $win = $null
+          foreach ($w in $AE::RootElement.FindAll($scope::Children, $pidCond)) {
+            "Fenster: Name='{0}' Klasse='{1}' Rechteck={2}" -f $w.Current.Name, $w.Current.ClassName, $w.Current.BoundingRectangle
+            if ($w.Current.Name -eq 'StayGreen' -and $null -eq $win) { $win = $w }
+          }
+          if ($null -eq $win) { throw 'Hauptfenster nicht gefunden' }
+          "Hauptfenster: {0}" -f $win.Current.BoundingRectangle
+
           # Fenster nach vorn holen (SetFocus ist fuer Top-Level-Fenster in UI-Automation nicht erlaubt)
           Add-Type -Namespace Win -Name U -MemberDefinition '[DllImport("user32.dll")] public static extern bool SetForegroundWindow(System.IntPtr h);'
           [void][Win.U]::SetForegroundWindow([IntPtr]$win.Current.NativeWindowHandle)
@@ -60,6 +67,11 @@ jobs:
             $g.Dispose(); $bmp.Dispose()
           }
 
+          "Elemente im Fenster (Auszug):"
+          $n = 0
+          foreach ($e in $win.FindAll($scope::Descendants, [System.Windows.Automation.Condition]::TrueCondition)) {
+            if ($n++ -lt 40) { "  {0} | {1}" -f $e.Current.ControlType.ProgrammaticName, $e.Current.Name }
+          }
           $tabCond = New-Object System.Windows.Automation.PropertyCondition($AE::ControlTypeProperty, [System.Windows.Automation.ControlType]::TabItem)
           $tabs = $win.FindAll($scope::Descendants, $tabCond)
           "Registerkarten gefunden: $($tabs.Count)"
