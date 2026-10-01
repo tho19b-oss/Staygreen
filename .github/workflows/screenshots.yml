@@ -1,8 +1,7 @@
 name: Screenshots
 
-# Manuell auszufuehren: startet die EXE auf einem echten Windows, schaltet per UI-Automation durch die
-# Registerkarten und legt Bilder ab (Artefakt "StayGreen-screenshots"). Mit "print_base64" werden sie zusaetzlich
-# als Text ins Protokoll geschrieben.
+# Manuell auszufuehren: startet die EXE auf einem echten Windows in mehreren Zustaenden und legt Bilder des Fensters
+# ab (Artefakt "StayGreen-screenshots"). Mit "print_base64" werden sie zusaetzlich als Text ins Protokoll geschrieben.
 on:
   workflow_dispatch:
     inputs:
@@ -28,72 +27,63 @@ jobs:
         shell: powershell
         run: |
           Add-Type -AssemblyName System.Windows.Forms, System.Drawing, UIAutomationClient, UIAutomationTypes
+          Add-Type -TypeDefinition @'
+          using System;
+          using System.Runtime.InteropServices;
+          public static class WinApi {
+            [StructLayout(LayoutKind.Sequential)] public struct RECT { public int Left, Top, Right, Bottom; }
+            [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);
+            [DllImport("dwmapi.dll")] public static extern int DwmGetWindowAttribute(IntPtr hwnd, int attr, out RECT rect, int size);
+            // Sichtbarer Fensterrahmen ohne den unsichtbaren Schattenrand
+            public static RECT FrameBounds(IntPtr hwnd) { RECT r; DwmGetWindowAttribute(hwnd, 9, out r, Marshal.SizeOf(typeof(RECT))); return r; }
+          }
+          '@
+
           $AE = [System.Windows.Automation.AutomationElement]
           $scope = [System.Windows.Automation.TreeScope]
-
           $exe = Join-Path $PWD 'src\StayGreen\bin\Release\net472\StayGreen.exe'
-          $ini = Join-Path $env:RUNNER_TEMP 'shots.ini'
-          @('StartHoldingOnLaunch=true', 'SmartIdle=false') | Set-Content -Path $ini -Encoding ASCII
           New-Item -ItemType Directory -Force -Path shots | Out-Null
-
           $screen = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
           "Bildschirm: $($screen.Width)x$($screen.Height)"
 
-          $proc = Start-Process -FilePath $exe -ArgumentList @('--settings', $ini, '--lang', 'de') -PassThru
-          Start-Sleep -Seconds 5
+          function Take-Shot($name, $lang, $tab, $extraArgs, $iniLines) {
+            $ini = Join-Path $env:RUNNER_TEMP "$name.ini"
+            $iniLines | Set-Content -Path $ini -Encoding ASCII
+            $argList = @('--settings', $ini, '--lang', $lang) + $extraArgs
+            if ($tab) { $argList += @('--tab', $tab) }
+            $proc = Start-Process -FilePath $exe -ArgumentList $argList -PassThru
+            Start-Sleep -Seconds 4
 
-          # Alle Top-Level-Fenster des Prozesses auflisten (Diagnose) und das Hauptfenster ueber den Titel waehlen.
-          $pidCond = New-Object System.Windows.Automation.PropertyCondition($AE::ProcessIdProperty, $proc.Id)
-          $win = $null
-          foreach ($w in $AE::RootElement.FindAll($scope::Children, $pidCond)) {
-            "Fenster: Name='{0}' Klasse='{1}' Rechteck={2}" -f $w.Current.Name, $w.Current.ClassName, $w.Current.BoundingRectangle
-            if ($w.Current.Name -eq 'StayGreen' -and $null -eq $win) { $win = $w }
-          }
-          if ($null -eq $win) { throw 'Hauptfenster nicht gefunden' }
-          "Hauptfenster: {0}" -f $win.Current.BoundingRectangle
+            $cond = New-Object System.Windows.Automation.PropertyCondition($AE::ProcessIdProperty, $proc.Id)
+            $win = $null
+            foreach ($w in $AE::RootElement.FindAll($scope::Children, $cond)) {
+              if ($w.Current.Name -eq 'StayGreen' -and $null -eq $win) { $win = $w }
+            }
+            if ($null -eq $win) { Stop-Process -Id $proc.Id -Force; throw "Fenster '$name' nicht gefunden" }
 
-          # Fenster nach vorn holen (SetFocus ist fuer Top-Level-Fenster in UI-Automation nicht erlaubt)
-          Add-Type -Namespace Win -Name U -MemberDefinition '[DllImport("user32.dll")] public static extern bool SetForegroundWindow(System.IntPtr h);'
-          [void][Win.U]::SetForegroundWindow([IntPtr]$win.Current.NativeWindowHandle)
-          Start-Sleep -Milliseconds 800
-
-          function Save-Shot($name) {
-            $r = $win.Current.BoundingRectangle
-            "{0}: Fenster {1},{2} {3}x{4}" -f $name, [int]$r.X, [int]$r.Y, [int]$r.Width, [int]$r.Height
-            $bmp = New-Object System.Drawing.Bitmap ([int]$r.Width), ([int]$r.Height)
+            $h = [IntPtr]$win.Current.NativeWindowHandle
+            [void][WinApi]::SetForegroundWindow($h)
+            Start-Sleep -Milliseconds 800
+            $r = [WinApi]::FrameBounds($h)
+            $w = $r.Right - $r.Left; $hgt = $r.Bottom - $r.Top
+            "{0}: {1},{2} {3}x{4}" -f $name, $r.Left, $r.Top, $w, $hgt
+            $bmp = New-Object System.Drawing.Bitmap -ArgumentList $w, $hgt, ([System.Drawing.Imaging.PixelFormat]::Format24bppRgb)
             $g = [System.Drawing.Graphics]::FromImage($bmp)
-            $g.CopyFromScreen([int]$r.X, [int]$r.Y, 0, 0, $bmp.Size)
+            $g.CopyFromScreen($r.Left, $r.Top, 0, 0, $bmp.Size)
             $bmp.Save((Join-Path 'shots' "$name.png"), [System.Drawing.Imaging.ImageFormat]::Png)
             $g.Dispose(); $bmp.Dispose()
+            Stop-Process -Id $proc.Id -Force
+            Start-Sleep -Milliseconds 500
           }
 
-          "Elemente im Fenster (Auszug):"
-          $n = 0
-          foreach ($e in $win.FindAll($scope::Descendants, [System.Windows.Automation.Condition]::TrueCondition)) {
-            if ($n++ -lt 40) { "  {0} | {1}" -f $e.Current.ControlType.ProgrammaticName, $e.Current.Name }
-          }
-          $tabCond = New-Object System.Windows.Automation.PropertyCondition($AE::ControlTypeProperty, [System.Windows.Automation.ControlType]::TabItem)
-          $tabs = $win.FindAll($scope::Descendants, $tabCond)
-          "Registerkarten gefunden: $($tabs.Count)"
-          $i = 1
-          foreach ($t in $tabs) {
-            $t.GetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern).Select()
-            Start-Sleep -Milliseconds 1500
-            Save-Shot ('{0}-{1}' -f $i, ($t.Current.Name -replace '[^A-Za-z0-9]', ''))
-            $i++
-          }
+          $base = @('StartHoldingOnLaunch=true')
+          Take-Shot 'de-1-aktivitaet' 'de' $null @() $base
+          Take-Shot 'de-2-zeitplan' 'de' 'schedule' @() ($base + @('ScheduleEnabled=true', 'Rule=1111100;08:00;12:00', 'Rule=1111100;13:00;17:00'))
+          Take-Shot 'de-3-autostopp' 'de' 'stop' @() ($base + @('AutoStopEnabled=true', 'AutoStopTiming=Daily', 'AutoStopTime=17:00', 'StopCloseTeams=true', 'StopLock=true', 'StopExitApp=true'))
+          Take-Shot 'de-4-system' 'de' 'system' @() ($base + @('LogEnabled=true'))
+          Take-Shot 'de-5-gestoppt' 'de' $null @('--no-start') $base
+          Take-Shot 'en-1-activity' 'en' $null @() $base
 
-          # Zustand "Gestoppt": Knopf "Stoppen" ausloesen
-          $btnCond = New-Object System.Windows.Automation.PropertyCondition($AE::ControlTypeProperty, [System.Windows.Automation.ControlType]::Button)
-          $stop = $null
-          foreach ($b in $win.FindAll($scope::Descendants, $btnCond)) { if ($b.Current.Name -eq 'Stoppen') { $stop = $b } }
-          if ($stop) {
-            $stop.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()
-            Start-Sleep -Milliseconds 1500
-            Save-Shot '9-Gestoppt'
-          } else { Write-Warning 'Knopf Stoppen nicht gefunden' }
-
-          Stop-Process -Id $proc.Id -Force
           Get-ChildItem shots | ForEach-Object { "{0}  {1} Byte" -f $_.Name, $_.Length }
 
           if ('${{ inputs.print_base64 }}' -eq 'true') {

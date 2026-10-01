@@ -4,14 +4,14 @@
 
 A tiny Windows app: **one single file** (`StayGreen.exe`, about 140 KB), **no installation**, **no administrator rights**, **no network access**.
 
-[**⬇ Download the latest version**](https://github.com/tho19b-oss/Staygreen/releases/latest) · [Deutsche Version](README.md)
+[**⬇ Download StayGreen.exe directly**](https://github.com/tho19b-oss/Staygreen/releases/latest/download/StayGreen.exe) · [all downloads](https://github.com/tho19b-oss/Staygreen/releases/latest) · [Deutsche Version](README.md)
 
 ---
 
 ## Ready in one minute
 
-1. Download **`StayGreen.exe`** from the [releases page](https://github.com/tho19b-oss/Staygreen/releases/latest) and double-click it.
-2. If Windows shows "Windows protected your PC" (SmartScreen): **More info → Run anyway**. The EXE is not code-signed, so Windows asks for every new, unknown file.
+1. Download **`StayGreen.exe`** (link above) and double-click it. If a corporate web filter blocks EXE downloads, the [releases page](https://github.com/tho19b-oss/Staygreen/releases/latest) has the same file as `StayGreen-portable.zip`.
+2. If Windows shows "Windows protected your PC" (SmartScreen): **More info → Run anyway**. The EXE is not code-signed, so Windows asks for every new, unknown file. Alternatively right-click the file → *Properties* → tick **Unblock** → *OK* beforehand.
 3. Done. StayGreen starts right away, the lamp at the top of the window turns green and your status stays green. Click **Stop** to end it.
 
 ## Features
@@ -32,7 +32,7 @@ A tiny Windows app: **one single file** (`StayGreen.exe`, about 140 KB), **no in
 | **German & English** | Automatic by Windows language, switchable. |
 | **Portable** | A file named `StayGreen.portable` next to the EXE keeps the settings there as well (e.g. for a USB stick). |
 | **Single instance** | A second start brings the existing window to the front. |
-| **Command line** | `--start`, `--no-start`, `--minimized`, `--settings <file>`, `--lang de\|en`, `--selftest`, `--help`. |
+| **Command line** | `--start`, `--no-start`, `--minimized`, `--tab <name>`, `--settings <file>`, `--lang de\|en`, `--selftest`, `--help`. |
 
 Works with Microsoft Teams (new and classic), Skype for Business, Slack, Zoom, Webex and anything that evaluates the Windows idle time.
 

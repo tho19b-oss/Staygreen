@@ -4,14 +4,14 @@
 
 Eine winzige Windows-App: **eine einzige Datei** (`StayGreen.exe`, rund 140 KB), **ohne Installation**, **ohne Administratorrechte**, **ohne Netzwerkzugriff**.
 
-[**⬇ Neueste Version herunterladen**](https://github.com/tho19b-oss/Staygreen/releases/latest) · [English version](README.en.md)
+[**⬇ StayGreen.exe direkt herunterladen**](https://github.com/tho19b-oss/Staygreen/releases/latest/download/StayGreen.exe) · [alle Downloads](https://github.com/tho19b-oss/Staygreen/releases/latest) · [English version](README.en.md)
 
 ---
 
 ## In einer Minute startklar
 
-1. Auf der [Release-Seite](https://github.com/tho19b-oss/Staygreen/releases/latest) **`StayGreen.exe`** herunterladen und doppelklicken.
-2. Zeigt Windows „Der Computer wurde durch Windows geschützt“ (SmartScreen)? Dann **Weitere Informationen → Trotzdem ausführen**. Die EXE ist nicht digital signiert, deshalb fragt Windows bei jeder neuen, unbekannten Datei nach.
+1. **`StayGreen.exe`** herunterladen (Link oben) und doppelklicken. Blockiert der Firmen-Webfilter den Download einer EXE, gibt es auf der [Release-Seite](https://github.com/tho19b-oss/Staygreen/releases/latest) dieselbe Datei als `StayGreen-portable.zip`.
+2. Zeigt Windows „Der Computer wurde durch Windows geschützt“ (SmartScreen)? Dann **Weitere Informationen → Trotzdem ausführen**. Die EXE ist nicht digital signiert, deshalb fragt Windows bei jeder neuen, unbekannten Datei nach. Alternativ vorab per Rechtsklick auf die Datei → *Eigenschaften* → Haken bei **Zulassen** → *OK*.
 3. Fertig. StayGreen startet sofort, die Lampe oben im Fenster wird grün, und dein Status bleibt grün. Mit **Stoppen** hörst du wieder auf.
 
 Beim ersten Mal lohnt ein Blick auf die Registerkarte **System**: Dort stellst du ein, ob StayGreen mit Windows starten und im Infobereich neben der Uhr weiterlaufen soll.
@@ -36,7 +36,7 @@ Beim ersten Mal lohnt ein Blick auf die Registerkarte **System**: Dort stellst d
 | **Deutsch & Englisch** | Automatisch nach Windows-Sprache, umschaltbar. |
 | **Portabel** | Eine Datei `StayGreen.portable` neben der EXE → Einstellungen liegen ebenfalls dort (z. B. für USB-Stick). |
 | **Einzelinstanz** | Ein zweiter Start holt das vorhandene Fenster nach vorn. |
-| **Kommandozeile** | `--start`, `--no-start`, `--minimized`, `--settings <Datei>`, `--lang de\|en`, `--selftest`, `--help`. |
+| **Kommandozeile** | `--start`, `--no-start`, `--minimized`, `--tab <Name>`, `--settings <Datei>`, `--lang de\|en`, `--selftest`, `--help`. |
 
 Funktioniert mit Microsoft Teams (neu und klassisch), Skype for Business, Slack, Zoom, Webex und allem, was die Leerlaufzeit von Windows auswertet.
 

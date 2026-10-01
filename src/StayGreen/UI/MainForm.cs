@@ -253,6 +253,12 @@ namespace StayGreen.UI
             return true;
         }
 
+        /// <summary>Zeigt die Registerkarte mit diesem Index (0 Aktivitaet, 1 Zeitplan, 2 Auto-Stopp, 3 System).</summary>
+        public void SelectTab(int index)
+        {
+            if (index >= 0 && index < _tabs.TabPages.Count) _tabs.SelectedIndex = index;
+        }
+
         protected override void OnResize(EventArgs e)
         {
             base.OnResize(e);

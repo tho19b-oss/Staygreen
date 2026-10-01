@@ -71,6 +71,7 @@ namespace StayGreen.UI
             _form.SystemPage.OpenFolderRequested = OpenSettingsFolder;
             _form.SystemPage.OpenLogRequested = OpenLogFile;
             _form.LoadSettings(_settings);
+            _form.SelectTab(_cmd.Tab);
             IntPtr unused = _form.Handle; // Handle jetzt anlegen, damit Signale der zweiten Instanz ankommen
 
             _tray = BuildTray();

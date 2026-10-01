@@ -32,6 +32,9 @@ namespace StayGreen.Core
         /// <summary>"de" oder "en": Sprache nur fuer diesen Start.</summary>
         public string Language { get; private set; }
 
+        /// <summary>Registerkarte, die beim Start gezeigt wird (0 Aktivitaet, 1 Zeitplan, 2 Auto-Stopp, 3 System); -1 = Standard.</summary>
+        public int Tab { get; private set; } = -1;
+
         public static readonly string HelpText =
             "StayGreen [Optionen]\r\n\r\n"
             + "  --start            Aktivhalten sofort starten\r\n"
@@ -39,6 +42,7 @@ namespace StayGreen.Core
             + "  --minimized        Nur im Infobereich starten (ohne Fenster)\r\n"
             + "  --settings <Datei> Andere Einstellungsdatei verwenden\r\n"
             + "  --lang de|en       Sprache fuer diesen Start\r\n"
+            + "  --tab <Name>       Registerkarte oeffnen: activity, schedule, stop, system (oder 0-3)\r\n"
             + "  --selftest [Datei] Selbsttest ausfuehren und Ergebnis speichern\r\n"
             + "  --autostart        (intern) Start durch den Windows-Autostart\r\n"
             + "  --help             Diese Hilfe\r\n";
@@ -95,6 +99,9 @@ namespace StayGreen.Core
                     case "--settings":
                         result.SettingsPath = value ?? NextValue(args, ref i);
                         break;
+                    case "--tab":
+                        result.Tab = ParseTab(value ?? NextValue(args, ref i));
+                        break;
                     case "--lang":
                         string lang = (value ?? NextValue(args, ref i) ?? "").Trim().ToLowerInvariant();
                         if (lang == "de" || lang == "en") result.Language = lang;
@@ -102,6 +109,18 @@ namespace StayGreen.Core
                 }
             }
             return result;
+        }
+
+        static int ParseTab(string text)
+        {
+            switch ((text ?? "").Trim().ToLowerInvariant())
+            {
+                case "0": case "activity": case "aktivitaet": case "aktivität": return 0;
+                case "1": case "schedule": case "zeitplan": return 1;
+                case "2": case "stop": case "autostop": case "auto-stop": case "auto-stopp": case "autostopp": return 2;
+                case "3": case "system": return 3;
+                default: return -1;
+            }
         }
 
         /// <summary>Naechstes Argument als Wert, sofern es keine Option ist.</summary>

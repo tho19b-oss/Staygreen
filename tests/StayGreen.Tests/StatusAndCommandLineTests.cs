@@ -310,6 +310,30 @@ namespace StayGreen.Tests
             Assert.Equal(Path.Combine(Path.GetTempPath(), "staygreen-selftest.txt"), CommandLine.DefaultSelfTestPath);
         }
 
+        [Theory]
+        [InlineData("0", 0)]
+        [InlineData("activity", 0)]
+        [InlineData("Schedule", 1)]
+        [InlineData("zeitplan", 1)]
+        [InlineData("2", 2)]
+        [InlineData("auto-stopp", 2)]
+        [InlineData("system", 3)]
+        [InlineData("3", 3)]
+        [InlineData("7", -1)]
+        [InlineData("blah", -1)]
+        public void Tab_AcceptsNamesAndNumbers(string text, int expected)
+        {
+            Assert.Equal(expected, CommandLine.Parse(new[] { "--tab", text }).Tab);
+            Assert.Equal(expected, CommandLine.Parse(new[] { "--tab=" + text }).Tab);
+        }
+
+        [Fact]
+        public void Tab_DefaultsToMinusOne()
+        {
+            Assert.Equal(-1, CommandLine.Parse(new string[0]).Tab);
+            Assert.Equal(-1, CommandLine.Parse(new[] { "--tab" }).Tab);
+        }
+
         [Fact]
         public void InvalidLanguage_IsIgnored()
         {
