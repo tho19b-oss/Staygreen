@@ -253,11 +253,6 @@ namespace StayGreen.UI
             return true;
         }
 
-        public void SelectTab(int index)
-        {
-            if (index >= 0 && index < _tabs.TabPages.Count) _tabs.SelectedIndex = index;
-        }
-
         protected override void OnResize(EventArgs e)
         {
             base.OnResize(e);

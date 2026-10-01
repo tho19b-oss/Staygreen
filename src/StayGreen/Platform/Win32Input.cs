@@ -136,7 +136,6 @@ namespace StayGreen.Platform
     /// </summary>
     sealed class DemoInput : IInputBackend
     {
-        readonly DateTime _started = DateTime.UtcNow;
         DateTime _lastInput = DateTime.UtcNow.AddMinutes(-10);
 
         public bool SendActivity(ActivityMode mode, int mousePixels)

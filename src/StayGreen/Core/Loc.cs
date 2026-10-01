@@ -41,15 +41,6 @@ namespace StayGreen.Core
             return string.Format(CultureInfo.CurrentCulture, T(key), args);
         }
 
-        public static IEnumerable<string> Keys
-        {
-            get
-            {
-                EnsureLoaded();
-                return _de.Keys;
-            }
-        }
-
         public static bool HasKey(string key)
         {
             EnsureLoaded();
@@ -60,11 +51,6 @@ namespace StayGreen.Core
         public static string DayShort(int index)
         {
             return T("day." + index + ".short");
-        }
-
-        public static string DayLong(int index)
-        {
-            return T("day." + index + ".long");
         }
 
         static void EnsureLoaded()

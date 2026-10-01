@@ -199,7 +199,6 @@ namespace StayGreen.Tests
             for (int i = 0; i < 7; i++)
             {
                 Assert.True(Loc.HasKey("day." + i + ".short"), "day." + i + ".short");
-                Assert.True(Loc.HasKey("day." + i + ".long"), "day." + i + ".long");
             }
         }
 

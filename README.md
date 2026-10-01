@@ -53,6 +53,9 @@ Teams setzt dich nach etwa fünf Minuten ohne Tastatur- und Mausaktivität auf �
 
 ## Fehlersuche
 
+**Kommt überhaupt etwas an?**
+`StayGreen.exe --selftest` starten (z. B. über eine Verknüpfung mit diesem Zusatz). StayGreen prüft dann auf deinem Rechner, ob Windows Tastendruck und Mausbewegung annimmt und den Leerlaufzähler zurücksetzt, ob der Hotkey auslöst und ob der Autostart schreibbar ist, und zeigt das Ergebnis in einem Fenster. Der Test legt nichts dauerhaft an.
+
 **Der Status wird trotzdem „Abwesend“.**
 Auf der Karte *Aktivität* auf **Jetzt testen** klicken. Meldet StayGreen Erfolg, kommt die Eingabe bei Windows an. Dann hilft meist die Methode **Taste und Maus**, ein kürzeres Intervall (30 s) oder das Abschalten des intelligenten Modus. Zeigt die Statuskarte „Eingaben werden abgelehnt“, blockiert Windows die Eingabe (gesperrte Sitzung, getrennte Remote-Sitzung oder Sicherheitssoftware).
 

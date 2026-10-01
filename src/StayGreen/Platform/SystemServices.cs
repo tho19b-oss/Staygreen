@@ -175,11 +175,6 @@ namespace StayGreen.Platform
             }
         }
 
-        public static bool FileExists
-        {
-            get { return File.Exists(FilePath); }
-        }
-
         public static Settings Load()
         {
             try
