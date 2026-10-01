@@ -1,0 +1,145 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      release:
+        description: 'GitHub-Release mit der EXE erstellen (Tag v<Version> aus der .csproj)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Unit-Tests (Linux)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - name: Tests
+        run: dotnet test tests/StayGreen.Tests -c Release --nologo
+
+  windows:
+    name: Windows-Build, Selbsttest und Start-Test
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Build (Release)
+        run: dotnet build src/StayGreen/StayGreen.csproj -c Release --nologo -p:ContinuousIntegrationBuild=true
+
+      - name: Selbsttest (echte Eingaben, Leerlauf-Zaehler, Hotkey)
+        shell: pwsh
+        run: |
+          $exe = Join-Path $PWD 'src/StayGreen/bin/Release/net472/StayGreen.exe'
+          $out = Join-Path $env:RUNNER_TEMP 'selftest.txt'
+          $p = Start-Process -FilePath $exe -ArgumentList @('--selftest', $out) -Wait -PassThru
+          if (Test-Path $out) { Get-Content $out }
+          if ($p.ExitCode -ne 0) { throw "Selbsttest fehlgeschlagen (Exit-Code $($p.ExitCode))" }
+
+      - name: Start-Test (Fenster, Tray, Dauerbetrieb, Protokoll)
+        shell: pwsh
+        run: |
+          $exe = Join-Path $PWD 'src/StayGreen/bin/Release/net472/StayGreen.exe'
+          $ini = Join-Path $env:RUNNER_TEMP 'smoke.ini'
+          $log = Join-Path $env:RUNNER_TEMP 'smoke-protokoll.txt'
+          @(
+            'StartHoldingOnLaunch=true',
+            'SmartIdle=false',
+            'IntervalSeconds=5',
+            'LogEnabled=true',
+            "LogPath=$log"
+          ) | Set-Content -Path $ini -Encoding ASCII
+
+          $proc = Start-Process -FilePath $exe -ArgumentList @('--settings', $ini, '--lang', 'de') -PassThru
+          Start-Sleep -Seconds 12
+          $proc.Refresh()
+          if ($proc.HasExited) { throw "StayGreen wurde unerwartet beendet (Exit-Code $($proc.ExitCode))" }
+          "Fenstertitel: '$($proc.MainWindowTitle)'"
+          if ($proc.MainWindowTitle -ne 'StayGreen') { Write-Warning 'Hauptfenster nicht gefunden (nicht-interaktive Sitzung?)' }
+
+          # Zweiter Start muss sich sofort selbst beenden (Einzelinstanz).
+          $second = Start-Process -FilePath $exe -ArgumentList @('--settings', $ini) -PassThru
+          if (-not $second.WaitForExit(15000)) { $second.Kill(); throw 'Zweite Instanz wurde nicht beendet' }
+
+          Stop-Process -Id $proc.Id -Force
+          if (Test-Path $log) { Get-Content $log } else { throw 'Kein Protokoll geschrieben' }
+          if (-not (Select-String -Path $log -Pattern 'START' -Quiet)) { throw 'START fehlt im Protokoll' }
+
+      - name: Paket schnueren
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist, pkg | Out-Null
+          Copy-Item src/StayGreen/bin/Release/net472/StayGreen.exe dist/StayGreen.exe
+          Copy-Item dist/StayGreen.exe pkg/StayGreen.exe
+          New-Item -ItemType File -Force -Path pkg/StayGreen.portable | Out-Null
+          Copy-Item README.md pkg/README.md
+          Compress-Archive -Path pkg/* -DestinationPath dist/StayGreen-portable.zip -Force
+          Push-Location dist
+          Get-FileHash -Algorithm SHA256 StayGreen.exe, StayGreen-portable.zip |
+            ForEach-Object { '{0}  {1}' -f $_.Hash.ToLower(), (Split-Path $_.Path -Leaf) } |
+            Set-Content -Path SHA256SUMS.txt -Encoding ASCII
+          Get-Content SHA256SUMS.txt
+          Pop-Location
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: StayGreen-windows
+          path: dist/*
+          if-no-files-found: error
+
+  release:
+    name: Release veroeffentlichen
+    if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.release)
+    needs: [test, windows]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: StayGreen-windows
+          path: dist
+      - name: Release erstellen oder aktualisieren
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION=$(sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p' src/StayGreen/StayGreen.csproj | head -n1)
+          TAG="v${VERSION}"
+          {
+            echo "## StayGreen ${VERSION}"
+            echo
+            echo "**Download:** \`StayGreen.exe\` anklicken (eine einzelne Datei, keine Installation, keine Administratorrechte)."
+            echo "Alternativ \`StayGreen-portable.zip\`: EXE plus Marker-Datei, damit Einstellungen neben der EXE liegen (z. B. USB-Stick)."
+            echo
+            echo "**Download:** click \`StayGreen.exe\` (single file, no installation, no admin rights needed)."
+            echo
+            echo "Beim ersten Start zeigt Windows evtl. die SmartScreen-Warnung (die EXE ist nicht signiert): *Weitere Informationen* → *Trotzdem ausfuehren*."
+            echo
+            echo "### SHA256"
+            echo '```'
+            cat dist/SHA256SUMS.txt
+            echo '```'
+          } > RELEASE_NOTES.md
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" dist/StayGreen.exe dist/StayGreen-portable.zip dist/SHA256SUMS.txt --clobber
+          else
+            gh release create "$TAG" dist/StayGreen.exe dist/StayGreen-portable.zip dist/SHA256SUMS.txt \
+              --target "$GITHUB_SHA" --title "StayGreen ${VERSION}" --notes-file RELEASE_NOTES.md
+          fi
