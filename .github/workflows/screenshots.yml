@@ -1,17 +1,22 @@
 name: Screenshots
 
 # Manuell auszufuehren: startet die EXE auf einem echten Windows in mehreren Zustaenden und legt Bilder des Fensters
-# ab (Artefakt "StayGreen-screenshots"). Mit "print_base64" werden sie zusaetzlich als Text ins Protokoll geschrieben.
+# ab (Artefakt "StayGreen-screenshots"). Mit "commit" werden sie ausserdem nach docs/images/ eingecheckt (fuer die
+# README); mit "print_base64" zusaetzlich als Text ins Protokoll geschrieben.
 on:
   workflow_dispatch:
     inputs:
+      commit:
+        description: 'Bilder nach docs/images/ einchecken'
+        type: boolean
+        default: false
       print_base64:
         description: 'Bilder zusaetzlich als Base64 ins Protokoll schreiben'
         type: boolean
         default: false
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   shots:
@@ -99,3 +104,16 @@ jobs:
           name: StayGreen-screenshots
           path: shots/*.png
           if-no-files-found: error
+      - name: Bilder ins Repository uebernehmen
+        if: ${{ inputs.commit }}
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path docs/images | Out-Null
+          Copy-Item shots/*.png docs/images/ -Force
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add docs/images
+          git diff --cached --quiet
+          if ($LASTEXITCODE -eq 0) { 'Keine Aenderung an den Bildern'; exit 0 }
+          git commit -m 'Screenshots aktualisiert (aufgenommen auf Windows)'
+          git push
