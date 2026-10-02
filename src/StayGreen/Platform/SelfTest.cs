@@ -39,7 +39,7 @@ namespace StayGreen.Platform
             lines.Add("Windows: " + PlatformInfo.IsWindows + ", 64 Bit Prozess: " + (IntPtr.Size == 8)
                       + ", OS: " + Environment.OSVersion.VersionString + ", Runtime: " + Environment.Version);
 
-            int inputSize = Marshal.SizeOf(typeof(NativeMethods.INPUT));
+            int inputSize = Marshal.SizeOf<NativeMethods.INPUT>();
             check("sizeof(INPUT)", inputSize == NativeMethods.ExpectedInputSize,
                 inputSize + " Byte, erwartet " + NativeMethods.ExpectedInputSize);
 

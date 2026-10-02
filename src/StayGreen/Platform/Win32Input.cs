@@ -11,7 +11,7 @@ namespace StayGreen.Platform
     /// </summary>
     sealed class Win32Input : IInputBackend
     {
-        static readonly int InputSize = Marshal.SizeOf(typeof(NativeMethods.INPUT));
+        static readonly int InputSize = Marshal.SizeOf<NativeMethods.INPUT>();
 
         /// <summary>Letzter Win32-Fehlercode von SendInput (0 = kein Fehler); fuer Diagnose und Selbsttest.</summary>
         public int LastError { get; private set; }
@@ -122,7 +122,7 @@ namespace StayGreen.Platform
 
         public TimeSpan GetIdleTime()
         {
-            var info = new NativeMethods.LASTINPUTINFO { cbSize = (uint)Marshal.SizeOf(typeof(NativeMethods.LASTINPUTINFO)) };
+            var info = new NativeMethods.LASTINPUTINFO { cbSize = (uint)Marshal.SizeOf<NativeMethods.LASTINPUTINFO>() };
             if (!NativeMethods.GetLastInputInfo(ref info))
                 return TimeSpan.FromDays(1); // unbekannt: lieber eingreifen als den Status verlieren
 
