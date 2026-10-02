@@ -22,9 +22,10 @@ The first time, take a look at the **System** tab: there you choose whether Stay
 
 <p align="center">
   <img src="docs/images/en-1-activity.png" width="330" alt="StayGreen, Activity tab">
+  <img src="docs/images/en-2-schedule.png" width="330" alt="StayGreen, Schedule tab (waiting for the time window)">
 </p>
 
-*Captured on Windows 11. The lamp at the top shows the state: green = active, amber = waiting for the time window, red = input is being rejected, grey = stopped.*
+*Captured on Windows 11. The status card at the top shows the state and changes its tint accordingly: green = active, amber = waiting for the time window, red = input is being rejected, grey = stopped.*
 
 ## Features
 
@@ -33,8 +34,8 @@ The first time, take a look at the **System** tab: there you choose whether Stay
 | **Keeps your status green** | Generates a tiny real input at an adjustable interval (5–600 s, default 30 s): the **F15** key (no keyboard has it, nothing reacts to it), a **mouse movement** of a few pixels there and straight back, or both. |
 | **Smart mode** | Only acts while *you* are idle. While you work, StayGreen stays out of the way. |
 | **Keep PC awake** | Prevents standby, screen saver and automatic locking due to inactivity. |
-| **Schedule** | Only keep active in certain time windows, e.g. Mon–Fri 08:00–12:00 and 13:00–17:00. Several windows, any weekdays, also across midnight. Outside the windows StayGreen pauses and the PC may sleep. |
-| **Auto-stop** | Stop daily at a time **or** once at a date, optionally with: **close Teams** (status changes to "Offline"), **lock Windows**, **shut down the computer** (60-second countdown, cancellable, programs are not closed by force) and **exit StayGreen**. Appointments the PC slept through are not made up for. |
+| **Schedule** | On the *Schedule* tab: Only keep active in certain time windows, e.g. Mon–Fri 08:00–12:00 and 13:00–17:00. Several windows, any weekdays, also across midnight. Outside the windows StayGreen pauses and the PC may sleep. |
+| **Auto-stop** | On the *Schedule* tab, section "End of day": Stop daily at a time **or** once at a date, optionally with: **close Teams** (status changes to "Offline"), **lock Windows**, **shut down the computer** (60-second countdown, cancellable, programs are not closed by force) and **exit StayGreen**. Appointments the PC slept through are not made up for. |
 | **Autostart** | Start with Windows, no admin rights (per-user autostart). |
 | **Start automatically when opened** | A double-click is enough. |
 | **Notification area (tray)** | Minimizing and closing park StayGreen next to the clock. The icon shows the state (green, amber, red, grey). |
@@ -44,7 +45,7 @@ The first time, take a look at the **System** tab: there you choose whether Stay
 | **German & English** | Automatic by Windows language, switchable. |
 | **Portable** | A file named `StayGreen.portable` next to the EXE keeps the settings there as well (e.g. for a USB stick). |
 | **Single instance** | A second start brings the existing window to the front. |
-| **Command line** | `--start`, `--no-start`, `--minimized`, `--tab <name>`, `--settings <file>`, `--lang de\|en`, `--selftest`, `--help`. |
+| **Command line** | `--start`, `--no-start`, `--minimized`, `--tab <name>` (`activity`, `schedule`, `system`), `--settings <file>`, `--lang de\|en`, `--selftest`, `--help`. |
 
 Meant for Microsoft Teams (new and classic). The principle works with any program that evaluates the Windows idle time, for example Skype for Business, Slack, Zoom or Webex.
 
@@ -63,7 +64,7 @@ Teams sets you to "Away" after about five minutes without keyboard or mouse acti
 
 **Does anything arrive at all?** Start `StayGreen.exe --selftest` (e.g. via a shortcut with that addition). StayGreen then checks on your computer whether Windows accepts key presses and mouse movements and resets the idle counter, whether the hotkey fires and whether autostart is writable, and shows the result in a window. The test only writes a result file to the temp folder and removes its short-lived test autostart entry again immediately.
 
-**The status still turns to "Away".** On the *Activity* tab click **Test now**. If StayGreen reports success, the input reaches Windows. Then the method **Key and mouse**, a shorter interval (30 s) or switching off smart mode usually helps. If the status card says "Input is being rejected", Windows blocks the input (locked session, disconnected remote session or security software).
+**The status still turns to "Away".** On the *Activity* tab click **Test now**. If StayGreen reports success, the input reaches Windows. Then the method **Key and mouse**, a shorter interval (30 s) or switching off smart mode usually helps. If the status card at the top says "Input is being rejected", Windows blocks the input (locked session, disconnected remote session or security software).
 
 **Windows or the virus scanner blocks the file.** The EXE is unsigned and new, so SmartScreen and some scanners warn. You can verify the hash in `SHA256SUMS.txt` (attached to every release) or build the EXE from source (see below). If a company policy (e.g. AppLocker) blocks unsigned programs from the download folder, you need to talk to your IT department.
 
@@ -98,7 +99,7 @@ The EXE targets **.NET Framework 4.7.2**, which is built into Windows 10 (1803+)
 src/StayGreen/
   Core/       Platform-neutral logic: schedule, auto-stop, settings, engine, texts (tested)
   Platform/   Windows layer: SendInput, idle time, keep-awake, hotkey, autostart, self-test
-  UI/         User interface (WinForms): main window, tabs, tray, countdown
+  UI/         User interface (WinForms): main window, cards and switches, tray, countdown
 tests/        xUnit tests (run on Linux and Windows)
 tools/        make_icon.py generates the icon without third-party dependencies
 .github/      CI: tests, Windows build, self-test, start test, release

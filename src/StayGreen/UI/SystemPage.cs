@@ -1,4 +1,5 @@
 using System;
+using System.Drawing;
 using System.IO;
 using System.Windows.Forms;
 using StayGreen.Core;
@@ -12,33 +13,44 @@ namespace StayGreen.UI
         Failed,
     }
 
-    /// <summary>Autostart, Tray, Protokoll, Hotkey, Sprache.</summary>
+    /// <summary>Start, Tastenkombination, Protokoll, Sprache.</summary>
     sealed class SystemPage : PageBase
     {
-        readonly CheckBox _startOnLaunch = CreateCheck();
-        readonly CheckBox _autostart = CreateCheck();
-        readonly CheckBox _startMin = CreateCheck();
-        readonly CheckBox _tray = CreateCheck();
+        readonly Card _startCard = new Card();
+        readonly Card _hotkeyCard = new Card();
+        readonly Card _logCard = new Card();
+        readonly Card _generalCard = new Card();
 
-        readonly GroupBox _logGroup;
-        readonly CheckBox _log = CreateCheck();
-        readonly TextBox _logPath = new TextBox();
-        readonly Button _browse = new Button { Text = "…", AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink };
-        readonly Button _openLog = new Button { AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, Padding = new Padding(6, 0, 6, 0) };
+        readonly SwitchBox _startOnLaunch = CreateSwitch();
+        readonly SwitchBox _autostart = CreateSwitch();
+        readonly SwitchBox _startMin = CreateSwitch();
+        readonly SwitchBox _tray = CreateSwitch();
+        readonly SettingRow _startOnLaunchRow;
+        readonly SettingRow _autostartRow;
+        readonly SettingRow _startMinRow;
+        readonly SettingRow _trayRow;
 
-        readonly GroupBox _hotkeyGroup;
-        readonly CheckBox _hotkey = CreateCheck();
-        readonly CheckBox _ctrl = CreateCheck();
-        readonly CheckBox _alt = CreateCheck();
-        readonly CheckBox _shift = CreateCheck();
-        readonly CheckBox _win = CreateCheck();
-        readonly ComboBox _key = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 64 };
-        readonly WrapLabel _hotkeyStatus = CreateHint();
+        readonly SwitchBox _hotkey = CreateSwitch();
+        readonly SettingRow _hotkeyRow;
+        readonly ChipBox _ctrl = new ChipBox();
+        readonly ChipBox _alt = new ChipBox();
+        readonly ChipBox _shift = new ChipBox();
+        readonly ChipBox _win = new ChipBox();
+        readonly ComboBox _key = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = Dpi.Px(68) };
+        readonly Stack _comboRow;
 
-        readonly Label _langLabel = CreateLabel();
-        readonly ComboBox _lang = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 230 };
-        readonly Button _openFolder = new Button { AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, Padding = new Padding(8, 1, 8, 1) };
-        readonly WrapLabel _portable = CreateHint();
+        readonly SwitchBox _log = CreateSwitch();
+        readonly SettingRow _logRow;
+        readonly TextBox _logPath = new TextBox { BorderStyle = BorderStyle.FixedSingle };
+        readonly FlatButton _browse = CreateButton(ButtonKind.Secondary);
+        readonly FlatButton _openLog = CreateButton(ButtonKind.Secondary);
+        readonly Stack _logPathRow;
+        readonly Stack _logButtonRow;
+
+        readonly ComboBox _lang = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = Dpi.Px(200) };
+        readonly SettingRow _langRow;
+        readonly FlatButton _openFolder = CreateButton(ButtonKind.Secondary);
+        readonly SettingRow _folderRow;
 
         /// <summary>Standardpfad des Protokolls (vom Hauptfenster geliefert).</summary>
         public Func<string> DefaultLogPath = () => "";
@@ -49,63 +61,42 @@ namespace StayGreen.UI
 
         public SystemPage()
         {
-            TableLayoutPanel root = CreateRoot();
+            // Start
+            _startOnLaunchRow = new SettingRow(_startOnLaunch);
+            _autostartRow = new SettingRow(_autostart);
+            _startMinRow = new SettingRow(_startMin);
+            _trayRow = new SettingRow(_tray);
+            _startCard.AddRow(_startOnLaunchRow);
+            _startCard.AddRow(_autostartRow);
+            _startCard.AddRow(_startMinRow);
+            _startCard.AddRow(_trayRow);
 
-            AddRow(root, _startOnLaunch);
-            AddRow(root, _autostart);
-            AddRow(root, _startMin);
-            AddRow(root, _tray);
+            // Tastenkombination
+            _hotkeyRow = new SettingRow(_hotkey);
+            foreach (string k in Settings.HotkeyKeys) _key.Items.Add(k);
+            var combo = new InlineRow(_ctrl, _alt, _shift, _win, _key) { Gap = 8 };
+            _comboRow = Pad(combo, 2, 12);
+            _hotkeyCard.AddRow(_hotkeyRow);
+            _hotkeyCard.Add(_comboRow);
 
             // Protokoll
-            var logGrid = CreateGrid(3);
-            logGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
-            logGrid.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-            logGrid.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-            logGrid.Controls.Add(_log, 0, 0);
-            logGrid.SetColumnSpan(_log, 3);
-            _logPath.Dock = DockStyle.Fill;
-            _logPath.Margin = new Padding(3, 4, 3, 3);
-            _browse.Margin = new Padding(3, 3, 3, 3);
-            _openLog.Margin = new Padding(3, 3, 3, 3);
-            logGrid.Controls.Add(_logPath, 0, 1);
-            logGrid.Controls.Add(_browse, 1, 1);
-            logGrid.Controls.Add(_openLog, 2, 1);
-            _logGroup = CreateGroup(logGrid);
-            AddRow(root, _logGroup);
+            _logRow = new SettingRow(_log);
+            _logPathRow = Pad(_logPath, 2, 6);
+            _logButtonRow = Pad(new InlineRow(_browse, _openLog), 0, 10);
+            _logCard.AddRow(_logRow);
+            _logCard.Add(_logPathRow);
+            _logCard.Add(_logButtonRow);
 
-            // Hotkey
-            var hotkeyGrid = new TableLayoutPanel { AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, ColumnCount = 1 };
-            hotkeyGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
-            var combo = new FlowLayoutPanel { AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, WrapContents = true, Dock = DockStyle.Fill };
-            foreach (CheckBox box in new[] { _ctrl, _alt, _shift, _win })
-            {
-                box.Margin = new Padding(3, 6, 8, 3);
-                combo.Controls.Add(box);
-            }
-            _key.Margin = new Padding(3, 3, 3, 3);
-            foreach (string k in Settings.HotkeyKeys) _key.Items.Add(k);
-            combo.Controls.Add(_key);
-            hotkeyGrid.Controls.Add(_hotkey);
-            hotkeyGrid.Controls.Add(combo);
-            hotkeyGrid.Controls.Add(_hotkeyStatus);
-            _hotkeyStatus.Dock = DockStyle.Fill;
-            _hotkeyGroup = CreateGroup(hotkeyGrid);
-            AddRow(root, _hotkeyGroup);
+            // Sprache und Daten
+            _langRow = new SettingRow(_lang);
+            _folderRow = new SettingRow(_openFolder);
+            _generalCard.AddRow(_langRow);
+            _generalCard.AddRow(_folderRow);
 
-            // Sprache + Ordner
-            var langRow = CreateGrid(2);
-            langRow.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-            langRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
-            _lang.Margin = new Padding(3, 3, 3, 3);
-            langRow.Controls.Add(_langLabel, 0, 0);
-            langRow.Controls.Add(_lang, 1, 0);
-            AddRow(root, langRow);
-
-            var folderRow = new FlowLayoutPanel { AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, WrapContents = true };
-            _openFolder.Margin = new Padding(3, 3, 3, 3);
-            folderRow.Controls.Add(_openFolder);
-            AddRow(root, folderRow);
-            AddRow(root, _portable);
+            Controls.Add(_startCard);
+            Controls.Add(_hotkeyCard);
+            Controls.Add(_logCard);
+            Controls.Add(_generalCard);
 
             _startOnLaunch.CheckedChanged += (o, e) => { if (!Loading && S != null) { S.StartHoldingOnLaunch = _startOnLaunch.Checked; Fire(); } };
             _autostart.CheckedChanged += (o, e) => { if (!Loading && S != null) { S.StartWithWindows = _autostart.Checked; Fire(); } };
@@ -114,9 +105,9 @@ namespace StayGreen.UI
 
             _log.CheckedChanged += (o, e) =>
             {
+                UpdateEnabled();
                 if (Loading || S == null) return;
                 S.LogEnabled = _log.Checked;
-                UpdateEnabled();
                 Fire();
             };
             _logPath.Leave += (o, e) => CommitLogPath();
@@ -133,9 +124,9 @@ namespace StayGreen.UI
 
             _hotkey.CheckedChanged += (o, e) =>
             {
+                UpdateEnabled();
                 if (Loading || S == null) return;
                 S.HotkeyEnabled = _hotkey.Checked;
-                UpdateEnabled();
                 Fire();
             };
             _ctrl.CheckedChanged += (o, e) => HotkeyEdited();
@@ -223,14 +214,9 @@ namespace StayGreen.UI
         void UpdateEnabled()
         {
             bool log = _log.Checked;
-            _logPath.Enabled = log;
+            _logPathRow.Enabled = log;
             _browse.Enabled = log;
-            bool hotkey = _hotkey.Checked;
-            _ctrl.Enabled = hotkey;
-            _alt.Enabled = hotkey;
-            _shift.Enabled = hotkey;
-            _win.Enabled = hotkey;
-            _key.Enabled = hotkey;
+            _comboRow.Enabled = _hotkey.Checked;
         }
 
         public void SetHotkeyStatus(HotkeyState state, string description)
@@ -238,37 +224,46 @@ namespace StayGreen.UI
             switch (state)
             {
                 case HotkeyState.Active:
-                    _hotkeyStatus.Text = Loc.T("sys.hotkey.ok", description);
-                    _hotkeyStatus.ForeColor = Theme.Green;
+                    _hotkeyRow.Caption = Loc.T("sys.hotkey.ok", description);
+                    _hotkeyRow.CaptionColor = Theme.GreenButton;
                     break;
                 case HotkeyState.Failed:
-                    _hotkeyStatus.Text = Loc.T("sys.hotkey.fail", description);
-                    _hotkeyStatus.ForeColor = Theme.Red;
+                    _hotkeyRow.Caption = Loc.T("sys.hotkey.fail", description);
+                    _hotkeyRow.CaptionColor = Theme.Red;
                     break;
                 default:
-                    _hotkeyStatus.Text = "";
+                    _hotkeyRow.Caption = "";
                     break;
             }
+            RefreshLayout();
         }
 
         public override void ApplyTexts()
         {
-            _startOnLaunch.Text = Loc.T("sys.startonlaunch");
-            _autostart.Text = Loc.T("sys.autostart");
-            _startMin.Text = Loc.T("sys.startmin");
-            _tray.Text = Loc.T("sys.tray");
-            _logGroup.Text = Loc.T("sys.grp.log");
-            _log.Text = Loc.T("sys.log");
-            _openLog.Text = Loc.T("sys.log.open");
-            _hotkeyGroup.Text = Loc.T("sys.grp.hotkey");
-            _hotkey.Text = Loc.T("sys.hotkey");
+            _startCard.Text = Loc.T("sys.grp.start");
+            _startOnLaunchRow.Title = Loc.T("sys.startonlaunch");
+            _autostartRow.Title = Loc.T("sys.autostart");
+            _autostartRow.Caption = Loc.T("sys.autostart.hint");
+            _startMinRow.Title = Loc.T("sys.startmin");
+            _trayRow.Title = Loc.T("sys.tray");
+
+            _hotkeyCard.Text = Loc.T("sys.grp.hotkey");
+            _hotkeyRow.Title = Loc.T("sys.hotkey");
             _ctrl.Text = Loc.T("key.ctrl");
             _alt.Text = Loc.T("key.alt");
             _shift.Text = Loc.T("key.shift");
             _win.Text = Loc.T("key.win");
-            _langLabel.Text = Loc.T("sys.language");
-            _openFolder.Text = Loc.T("sys.openfolder");
-            _portable.Text = IsPortable ? Loc.T("sys.portable") : "";
+
+            _logCard.Text = Loc.T("sys.grp.log");
+            _logRow.Title = Loc.T("sys.log");
+            _browse.Text = Loc.T("sys.log.change");
+            _openLog.Text = Loc.T("sys.log.open");
+
+            _generalCard.Text = Loc.T("sys.grp.general");
+            _langRow.Title = Loc.T("sys.language");
+            _folderRow.Title = Loc.T("sys.folder");
+            _folderRow.Caption = IsPortable ? Loc.T("sys.portable") : "";
+            _openFolder.Text = Loc.T("sys.log.open");
 
             Quiet(() =>
             {

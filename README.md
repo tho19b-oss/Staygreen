@@ -14,22 +14,22 @@ Eine winzige Windows-App: **eine einzige Datei** (`StayGreen.exe`, rund 140 KB),
 2. Zeigt Windows „Der Computer wurde durch Windows geschützt“ (SmartScreen)? Dann **Weitere Informationen → Trotzdem ausführen**. Die EXE ist nicht digital signiert, deshalb fragt Windows bei jeder neuen, unbekannten Datei nach. Alternativ vorab per Rechtsklick auf die Datei → *Eigenschaften* → Haken bei **Zulassen** → *OK*.
 3. Fertig. StayGreen startet sofort, die Lampe oben im Fenster wird grün, und dein Status bleibt grün. Mit **Stoppen** hörst du wieder auf.
 
-Beim ersten Mal lohnt ein Blick auf die Registerkarte **System**: Dort stellst du ein, ob StayGreen mit Windows starten und im Infobereich neben der Uhr weiterlaufen soll.
+Beim ersten Mal lohnt ein Blick auf den Reiter **System**: Dort stellst du ein, ob StayGreen mit Windows starten und im Infobereich neben der Uhr weiterlaufen soll.
 
 > Windows 11 versteckt neue Symbole im Infobereich hinter dem Pfeil `^`. Ziehe das StayGreen-Symbol heraus, wenn du es dauerhaft sehen willst.
 
 ## So sieht es aus
 
 <p align="center">
-  <img src="docs/images/de-1-aktivitaet.png" width="330" alt="StayGreen, Karte Aktivität">
-  <img src="docs/images/de-2-zeitplan.png" width="330" alt="StayGreen, Karte Zeitplan (wartet auf das nächste Zeitfenster)">
+  <img src="docs/images/de-1-aktivitaet.png" width="330" alt="StayGreen, Reiter Aktivität">
+  <img src="docs/images/de-2-zeitplan.png" width="330" alt="StayGreen, Reiter Zeitplan mit Zeitfenstern (wartet auf das nächste Zeitfenster)">
 </p>
 <p align="center">
-  <img src="docs/images/de-3-autostopp.png" width="330" alt="StayGreen, Karte Auto-Stopp">
-  <img src="docs/images/de-4-system.png" width="330" alt="StayGreen, Karte System">
+  <img src="docs/images/de-3-autostopp.png" width="330" alt="StayGreen, Reiter Zeitplan mit Feierabend (Auto-Stopp)">
+  <img src="docs/images/de-4-system.png" width="330" alt="StayGreen, Reiter System">
 </p>
 
-*Aufnahmen auf Windows 11. Die Lampe oben zeigt den Zustand: grün = aktiv, gelb = wartet auf das Zeitfenster, rot = Eingaben werden abgelehnt, grau = gestoppt.*
+*Aufnahmen auf Windows 11. Die Statuskarte oben zeigt den Zustand an und färbt sich passend ein: grün = aktiv, gelb = wartet auf das Zeitfenster, rot = Eingaben werden abgelehnt, grau = gestoppt.*
 
 ## Funktionen
 
@@ -38,8 +38,8 @@ Beim ersten Mal lohnt ein Blick auf die Registerkarte **System**: Dort stellst d
 | **Status grün halten** | Erzeugt in einstellbaren Abständen (5–600 s, Standard 30 s) eine winzige echte Eingabe: Taste **F15** (gibt es auf keiner Tastatur und löst nirgends etwas aus), eine **Mausbewegung** von wenigen Pixeln hin und sofort zurück, oder beides. |
 | **Intelligenter Modus** | Greift nur ein, wenn *du* gerade nichts tust. Solange du arbeitest, bleibt StayGreen im Hintergrund. |
 | **PC wach halten** | Verhindert Standby, Bildschirmschoner und das automatische Sperren durch Inaktivität. |
-| **Zeitplan** | Nur in bestimmten Zeitfenstern aktiv halten, z. B. Mo–Fr 08:00–12:00 und 13:00–17:00. Mehrere Fenster, beliebige Wochentage, auch über Mitternacht (22:00–06:00). Außerhalb pausiert StayGreen und der PC darf schlafen. |
-| **Auto-Stopp** | Täglich zu einer Uhrzeit **oder** einmalig an einem Datum beenden, optional mit: **Teams beenden** (Status wechselt auf „Offline“), **Windows sperren**, **Computer herunterfahren** (60-Sekunden-Countdown, abbrechbar, ohne Zwangsbeenden von Programmen) und **StayGreen beenden**. Termine, die der PC verschlafen hat (Standby), werden nicht nachgeholt. |
+| **Zeitplan** | Im Reiter *Zeitplan*: Nur in bestimmten Zeitfenstern aktiv halten, z. B. Mo–Fr 08:00–12:00 und 13:00–17:00. Mehrere Fenster, beliebige Wochentage, auch über Mitternacht (22:00–06:00). Außerhalb pausiert StayGreen und der PC darf schlafen. |
+| **Auto-Stopp** | Im Reiter *Zeitplan*, Abschnitt „Feierabend“: Täglich zu einer Uhrzeit **oder** einmalig an einem Datum beenden, optional mit: **Teams beenden** (Status wechselt auf „Offline“), **Windows sperren**, **Computer herunterfahren** (60-Sekunden-Countdown, abbrechbar, ohne Zwangsbeenden von Programmen) und **StayGreen beenden**. Termine, die der PC verschlafen hat (Standby), werden nicht nachgeholt. |
 | **Autostart** | Mit Windows starten, ohne Administratorrechte (Benutzer-Autostart). |
 | **Beim Öffnen automatisch starten** | Doppelklick genügt, kein zusätzlicher Klick auf „Starten“. |
 | **Infobereich (Tray)** | Minimieren und Schließen legen StayGreen neben die Uhr. Das Symbol zeigt den Zustand (grün, gelb, rot, grau). |
@@ -49,7 +49,7 @@ Beim ersten Mal lohnt ein Blick auf die Registerkarte **System**: Dort stellst d
 | **Deutsch & Englisch** | Automatisch nach Windows-Sprache, umschaltbar. |
 | **Portabel** | Eine Datei `StayGreen.portable` neben der EXE → Einstellungen liegen ebenfalls dort (z. B. für USB-Stick). |
 | **Einzelinstanz** | Ein zweiter Start holt das vorhandene Fenster nach vorn. |
-| **Kommandozeile** | `--start`, `--no-start`, `--minimized`, `--tab <Name>`, `--settings <Datei>`, `--lang de\|en`, `--selftest`, `--help`. |
+| **Kommandozeile** | `--start`, `--no-start`, `--minimized`, `--tab <Name>` (`activity`, `schedule`, `system`), `--settings <Datei>`, `--lang de\|en`, `--selftest`, `--help`. |
 
 Gedacht für Microsoft Teams (neu und klassisch). Das Prinzip greift bei allen Programmen, die die Leerlaufzeit von Windows auswerten, zum Beispiel Skype for Business, Slack, Zoom oder Webex.
 
@@ -70,7 +70,7 @@ Teams setzt dich nach etwa fünf Minuten ohne Tastatur- und Mausaktivität auf �
 `StayGreen.exe --selftest` starten (z. B. über eine Verknüpfung mit diesem Zusatz). StayGreen prüft dann auf deinem Rechner, ob Windows Tastendruck und Mausbewegung annimmt und den Leerlaufzähler zurücksetzt, ob der Hotkey auslöst und ob der Autostart schreibbar ist, und zeigt das Ergebnis in einem Fenster. Der Test schreibt nur eine Ergebnisdatei in den Temp-Ordner und entfernt seinen kurzzeitigen Test-Eintrag im Autostart sofort wieder.
 
 **Der Status wird trotzdem „Abwesend“.**
-Auf der Karte *Aktivität* auf **Jetzt testen** klicken. Meldet StayGreen Erfolg, kommt die Eingabe bei Windows an. Dann hilft meist die Methode **Taste und Maus**, ein kürzeres Intervall (30 s) oder das Abschalten des intelligenten Modus. Zeigt die Statuskarte „Eingaben werden abgelehnt“, blockiert Windows die Eingabe (gesperrte Sitzung, getrennte Remote-Sitzung oder Sicherheitssoftware).
+Im Reiter *Aktivität* auf **Jetzt testen** klicken. Meldet StayGreen Erfolg, kommt die Eingabe bei Windows an. Dann hilft meist die Methode **Taste und Maus**, ein kürzeres Intervall (30 s) oder das Abschalten des intelligenten Modus. Zeigt die Statuskarte oben „Eingaben werden abgelehnt“, blockiert Windows die Eingabe (gesperrte Sitzung, getrennte Remote-Sitzung oder Sicherheitssoftware).
 
 **Windows oder der Virenscanner blockiert die Datei.**
 Die EXE ist nicht signiert und neu, deshalb warnen SmartScreen und manche Scanner. Du kannst den Hash in `SHA256SUMS.txt` (liegt bei jedem Release) prüfen oder die EXE aus dem Quelltext selbst bauen (siehe unten). Blockiert eine Firmenrichtlinie (z. B. AppLocker) das Ausführen unsignierter Programme aus dem Download-Ordner, bleibt nur die Rücksprache mit der IT.
@@ -79,7 +79,7 @@ Die EXE ist nicht signiert und neu, deshalb warnen SmartScreen und manche Scanne
 Eine Richtlinie verbietet dann das Schreiben des Autostart-Eintrags. StayGreen meldet das und lässt den Schalter aus.
 
 **Alles zurücksetzen.**
-StayGreen beenden, den Ordner `%APPDATA%\StayGreen` löschen. Den Autostart vorher auf der Karte *System* ausschalten (dabei wird der Eintrag unter `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` entfernt). Mehr hinterlässt StayGreen nicht.
+StayGreen beenden, den Ordner `%APPDATA%\StayGreen` löschen. Den Autostart vorher im Reiter *System* ausschalten (dabei wird der Eintrag unter `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` entfernt). Mehr hinterlässt StayGreen nicht.
 
 ## Datenschutz und Sicherheit
 
@@ -108,7 +108,7 @@ Die EXE zielt auf **.NET Framework 4.7.2**, das in Windows 10 (ab 1803) und Wind
 src/StayGreen/
   Core/       Plattformneutrale Logik: Zeitplan, Auto-Stopp, Einstellungen, Engine, Texte (getestet)
   Platform/   Windows-Schicht: SendInput, Leerlaufzeit, Wach-Halten, Hotkey, Autostart, Selbsttest
-  UI/         Oberfläche (WinForms): Hauptfenster, Registerkarten, Tray, Countdown
+  UI/         Oberfläche (WinForms): Hauptfenster, Karten und Schalter, Tray, Countdown
 tests/        xUnit-Tests (laufen auf Linux und Windows)
 tools/        make_icon.py erzeugt das Icon ohne Fremdabhängigkeiten
 .github/      CI: Tests, Windows-Build, Selbsttest, Start-Test, Release

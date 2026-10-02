@@ -34,6 +34,7 @@ jobs:
           public static class WinApi {
             [StructLayout(LayoutKind.Sequential)] public struct RECT { public int Left, Top, Right, Bottom; }
             [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);
+            [DllImport("user32.dll")] public static extern bool SetWindowPos(IntPtr h, IntPtr after, int x, int y, int cx, int cy, uint flags);
             [DllImport("dwmapi.dll")] public static extern int DwmGetWindowAttribute(IntPtr hwnd, int attr, out RECT rect, int size);
             // Sichtbarer Fensterrahmen ohne den unsichtbaren Schattenrand
             public static RECT FrameBounds(IntPtr hwnd) { RECT r; DwmGetWindowAttribute(hwnd, 9, out r, Marshal.SizeOf(typeof(RECT))); return r; }
@@ -47,7 +48,9 @@ jobs:
           $screen = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
           "Bildschirm: $($screen.Width)x$($screen.Height)"
 
-          function Take-Shot($name, $lang, $tab, $extraArgs, $iniLines) {
+          # $tall: Fenster vor der Aufnahme auf bis zu 1000 Pixel Hoehe ziehen (soweit der Bildschirm reicht), damit
+          # auch lange Seiten ganz zu sehen sind.
+          function Take-Shot($name, $lang, $tab, $extraArgs, $iniLines, $tall) {
             $ini = Join-Path $env:RUNNER_TEMP "$name.ini"
             $iniLines | Set-Content -Path $ini -Encoding ASCII
             $argList = @('--settings', $ini, '--lang', $lang) + $extraArgs
@@ -60,10 +63,24 @@ jobs:
             foreach ($w in $AE::RootElement.FindAll($scope::Children, $cond)) {
               if ($w.Current.Name -eq 'StayGreen' -and $null -eq $win) { $win = $w }
             }
-            if ($null -eq $win) { Stop-Process -Id $proc.Id -Force; throw "Fenster '$name' nicht gefunden" }
+            if ($null -eq $win) {
+              # Diagnose: ist das Programm abgestuerzt? Dann steht der Grund in error.log (neben der .ini).
+              $proc.Refresh()
+              "Prozess beendet: $($proc.HasExited)" + $(if ($proc.HasExited) { " (Exit-Code $($proc.ExitCode))" } else { '' })
+              $errLog = Join-Path $env:RUNNER_TEMP 'error.log'
+              if (Test-Path $errLog) { '--- error.log ---'; Get-Content $errLog } else { 'Keine error.log vorhanden' }
+              if (-not $proc.HasExited) { Stop-Process -Id $proc.Id -Force }
+              throw "Fenster '$name' nicht gefunden"
+            }
 
             $h = [IntPtr]$win.Current.NativeWindowHandle
             [void][WinApi]::SetForegroundWindow($h)
+            if ($tall) {
+              $br = $win.Current.BoundingRectangle
+              $newHeight = [Math]::Min(1000, $screen.Height - 40)
+              [void][WinApi]::SetWindowPos($h, [IntPtr]::Zero, [int]$br.Left, 5, [int]$br.Width, $newHeight, 0x14)
+              Start-Sleep -Milliseconds 800
+            }
             Start-Sleep -Milliseconds 800
             $r = [WinApi]::FrameBounds($h)
             $w = $r.Right - $r.Left; $hgt = $r.Bottom - $r.Top
@@ -78,12 +95,15 @@ jobs:
           }
 
           $base = @('StartHoldingOnLaunch=true')
-          Take-Shot 'de-1-aktivitaet' 'de' $null @() $base
-          Take-Shot 'de-2-zeitplan' 'de' 'schedule' @() ($base + @('ScheduleEnabled=true', 'Rule=1111100;08:00;12:00', 'Rule=1111100;13:00;17:00'))
-          Take-Shot 'de-3-autostopp' 'de' 'stop' @() ($base + @('AutoStopEnabled=true', 'AutoStopTiming=Daily', 'AutoStopTime=17:00', 'StopCloseTeams=true', 'StopLock=true', 'StopExitApp=true'))
-          Take-Shot 'de-4-system' 'de' 'system' @() ($base + @('LogEnabled=true', 'LogPath=C:\Users\Anna\Dokumente\StayGreen-Protokoll.txt'))
-          Take-Shot 'de-5-gestoppt' 'de' $null @('--no-start') $base
-          Take-Shot 'en-1-activity' 'en' $null @() $base
+          $schedule = @('ScheduleEnabled=true', 'Rule=1111100;08:00;12:00', 'Rule=1111100;13:00;17:00')
+          $autostop = @('AutoStopEnabled=true', 'AutoStopTiming=Daily', 'AutoStopTime=17:00', 'StopCloseTeams=true', 'StopLock=true', 'StopExitApp=true')
+          Take-Shot 'de-1-aktivitaet' 'de' $null @() $base $false
+          Take-Shot 'de-2-zeitplan' 'de' 'schedule' @() ($base + $schedule) $true
+          Take-Shot 'de-3-autostopp' 'de' 'stop' @() ($base + $autostop) $true
+          Take-Shot 'de-4-system' 'de' 'system' @() ($base + @('LogEnabled=true', 'LogPath=C:\Users\Anna\Dokumente\StayGreen-Protokoll.txt')) $true
+          Take-Shot 'de-5-gestoppt' 'de' $null @('--no-start') $base $false
+          Take-Shot 'en-1-activity' 'en' $null @() $base $false
+          Take-Shot 'en-2-schedule' 'en' 'schedule' @() ($base + $schedule + $autostop) $true
 
           Get-ChildItem shots | ForEach-Object { "{0}  {1} Byte" -f $_.Name, $_.Length }
       - uses: actions/upload-artifact@v5

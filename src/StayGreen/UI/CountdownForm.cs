@@ -11,9 +11,9 @@ namespace StayGreen.UI
     /// </summary>
     sealed class CountdownForm : Form
     {
-        readonly Label _text = new Label();
-        readonly Button _now = new Button();
-        readonly Button _cancel = new Button();
+        readonly WrapLabel _text = new WrapLabel { ForeColor = Theme.Text };
+        readonly FlatButton _now = new FlatButton { Kind = ButtonKind.Secondary, MinWidth = 150 };
+        readonly FlatButton _cancel = new FlatButton { Kind = ButtonKind.Primary, MinWidth = 150 };
         readonly Timer _timer = new Timer { Interval = 1000 };
         int _remaining;
 
@@ -21,9 +21,9 @@ namespace StayGreen.UI
         {
             _remaining = seconds;
 
-            AutoScaleDimensions = new SizeF(96F, 96F);
-            AutoScaleMode = AutoScaleMode.Dpi;
+            AutoScaleMode = AutoScaleMode.None;
             Font = SystemFonts.MessageBoxFont;
+            BackColor = Theme.Background;
             Text = Loc.T("cd.title");
             FormBorderStyle = FormBorderStyle.FixedDialog;
             StartPosition = FormStartPosition.CenterScreen;
@@ -31,18 +31,10 @@ namespace StayGreen.UI
             MaximizeBox = false;
             ShowInTaskbar = true;
             TopMost = true;
-            ClientSize = new Size(430, 130);
-
-            _text.SetBounds(16, 16, 398, 56);
-            _text.AutoSize = false;
-            _text.UseMnemonic = false;
 
             _now.Text = Loc.T("cd.now");
-            _now.SetBounds(16, 84, 190, 32);
             _now.DialogResult = DialogResult.OK;
-
             _cancel.Text = Loc.T("cd.cancel");
-            _cancel.SetBounds(224, 84, 190, 32);
             _cancel.DialogResult = DialogResult.Cancel;
 
             Controls.Add(_text);
@@ -50,6 +42,9 @@ namespace StayGreen.UI
             Controls.Add(_cancel);
             CancelButton = _cancel;
             AcceptButton = _cancel; // Enter bricht ab: lieber zu vorsichtig als versehentlich herunterfahren
+
+            UpdateText();
+            ArrangeControls();
 
             _timer.Tick += (o, e) =>
             {
@@ -63,7 +58,25 @@ namespace StayGreen.UI
                 }
                 UpdateText();
             };
-            UpdateText();
+        }
+
+        void ArrangeControls()
+        {
+            int margin = Dpi.Px(20);
+            int width = Dpi.Px(460);
+            int inner = width - 2 * margin;
+
+            int textHeight = Math.Max(_text.MeasureHeight(inner), Dpi.Px(48));
+            _text.SetBounds(margin, margin, inner, textHeight);
+
+            int gap = Dpi.Px(12);
+            int buttonWidth = (inner - gap) / 2;
+            int buttonHeight = _now.Height;
+            int y = margin + textHeight + Dpi.Px(16);
+            _now.SetBounds(margin, y, buttonWidth, buttonHeight);
+            _cancel.SetBounds(margin + buttonWidth + gap, y, inner - buttonWidth - gap, buttonHeight);
+
+            ClientSize = new Size(width, y + buttonHeight + margin);
         }
 
         void UpdateText()
