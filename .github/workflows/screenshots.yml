@@ -56,42 +56,33 @@ jobs:
           $screen = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
           "Bildschirm: $($screen.Width)x$($screen.Height)"
 
-          # Nur im Zusatzlauf: Prueft die Bedienelemente per UI Automation und schreibt das Ergebnis ins Protokoll.
-          # - Auswahl- und Zahlenfelder: Name und aktueller Wert. Nach dem Scrollen muessen noch die Ausgangswerte stehen
-          #   (das Mausrad ueber einem Feld darf nichts verstellen, die Seite scrollt stattdessen).
-          # - Bedienelemente ohne Namen (Screenreader) werden einzeln gemeldet; die Teile eines Auswahl- oder Zahlenfelds zaehlen nicht.
+          # Nur im Zusatzlauf: Gibt die Bedienelemente per UI Automation im Protokoll aus (Typ | Name | Klasse | Wert),
+          # damit sich pruefen laesst
+          # - ob alle Bedienelemente einen Namen haben (Screenreader): Zeilen mit "OHNE NAMEN",
+          # - ob nach dem Scrollen noch die Ausgangswerte der Auswahl- und Zahlenfelder stehen (das Mausrad ueber einem
+          #   Feld darf nichts verstellen, die Seite scrollt stattdessen).
+          # Fehler beim Auslesen werden gezaehlt und gemeldet, nicht verschluckt.
           function Probe-Fields($win, $name) {
             $trueCond = [System.Windows.Automation.Condition]::TrueCondition
-            $walker = [System.Windows.Automation.TreeWalker]::ControlViewWalker
-            $fieldTypes = @('ControlType.ComboBox', 'ControlType.Spinner', 'ControlType.CheckBox', 'ControlType.Button', 'ControlType.Edit')
+            $fieldTypes = @('ComboBox', 'Spinner', 'CheckBox', 'Button', 'Edit')
             $all = $win.FindAll($scope::Descendants, $trueCond)
             $unnamed = 0
+            $errors = 0
+            $lines = @()
             foreach ($e in $all) {
               try {
-                $type = $e.Current.ControlType.ProgrammaticName
-                if ($fieldTypes -notcontains $type) { continue }
-                $short = $type.Replace('ControlType.', '')
-                $parent = $walker.GetParent($e)
-                $parentType = ''
-                if ($null -ne $parent) { $parentType = $parent.Current.ControlType.ProgrammaticName }
-                $inner = ($parentType -eq 'ControlType.ComboBox' -or $parentType -eq 'ControlType.Spinner')
-                if ($type -eq 'ControlType.ComboBox' -or $type -eq 'ControlType.Spinner') {
-                  $parts = @()
-                  foreach ($k in $e.FindAll($scope::Children, $trueCond)) {
-                    $parts += ('{0}={1}' -f $k.Current.ControlType.ProgrammaticName.Replace('ControlType.', ''), $k.Current.Name)
-                  }
-                  $value = ''
-                  $pattern = $null
-                  if ($e.TryGetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern, [ref]$pattern)) { $value = $pattern.Current.Value }
-                  "  {0}: {1} '{2}' Wert='{3}' Teile=[{4}]" -f $name, $short, $e.Current.Name, $value, ($parts -join '; ')
-                }
-                if (-not $inner -and [string]::IsNullOrWhiteSpace($e.Current.Name)) {
-                  $unnamed++
-                  "  {0}: OHNE NAMEN: {1} bei {2}" -f $name, $short, $e.Current.BoundingRectangle
-                }
-              } catch { }
+                $short = $e.Current.ControlType.ProgrammaticName.Replace('ControlType.', '')
+                $label = $e.Current.Name
+                $value = ''
+                $pattern = $null
+                if ($e.TryGetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern, [ref]$pattern)) { $value = $pattern.Current.Value }
+                $isField = $fieldTypes -contains $short
+                if ($isField -and [string]::IsNullOrWhiteSpace($label)) { $unnamed++; $lines += ('    OHNE NAMEN: {0} | Klasse {1}' -f $short, $e.Current.ClassName) }
+                if ($isField) { $lines += ('    {0} | {1} | {2} | {3}' -f $short, $label, $e.Current.ClassName, $value) }
+              } catch { $errors++ }
             }
-            "  {0}: {1} Elemente im Fenster, {2} Bedienelemente ohne Namen" -f $name, $all.Count, $unnamed
+            "  {0}: {1} Elemente, {2} Fehler beim Auslesen, {3} Bedienelemente ohne Namen" -f $name, $all.Count, $errors, $unnamed
+            $lines
           }
 
           # $tall: Fenster vor der Aufnahme auf bis zu 1000 Pixel Hoehe ziehen (soweit der Bildschirm reicht), damit
