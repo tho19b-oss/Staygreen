@@ -35,18 +35,6 @@ namespace StayGreen.Core
         /// <summary>Registerkarte, die beim Start gezeigt wird (0 Aktivitaet, 1 Zeitplan, 2 Auto-Stopp, 3 System); -1 = Standard.</summary>
         public int Tab { get; private set; } = -1;
 
-        public static readonly string HelpText =
-            "StayGreen [Optionen]\r\n\r\n"
-            + "  --start            Aktivhalten sofort starten\r\n"
-            + "  --no-start         Aktivhalten nicht automatisch starten\r\n"
-            + "  --minimized        Nur im Infobereich starten (ohne Fenster)\r\n"
-            + "  --settings <Datei> Andere Einstellungsdatei verwenden\r\n"
-            + "  --lang de|en       Sprache fuer diesen Start\r\n"
-            + "  --tab <Name>       Registerkarte oeffnen: activity, schedule, stop, system (oder 0-3)\r\n"
-            + "  --selftest [Datei] Selbsttest ausfuehren und Ergebnis speichern\r\n"
-            + "  --autostart        (intern) Start durch den Windows-Autostart\r\n"
-            + "  --help             Diese Hilfe\r\n";
-
         public static string DefaultSelfTestPath
         {
             get { return Path.Combine(Path.GetTempPath(), "staygreen-selftest.txt"); }

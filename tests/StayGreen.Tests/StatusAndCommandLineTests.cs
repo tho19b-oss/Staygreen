@@ -124,6 +124,17 @@ namespace StayGreen.Tests
         }
 
         [Fact]
+        public void When_UsesTheDateStyleOfTheSelectedLanguage()
+        {
+            DateTime now = T.Mon(10);
+            Loc.Language = "en";
+            Assert.Equal("today 17:00", StatusBuilder.When(T.Mon(17), now));
+            Assert.Equal("Wed 08:00", StatusBuilder.When(T.Day(2, 8), now));
+            Assert.Equal("Oct 12 08:00", StatusBuilder.When(T.Day(7, 8), now));
+            Assert.Equal("Nov 2 08:00", StatusBuilder.When(T.Day(28, 8), now));
+        }
+
+        [Fact]
         public void PlanLine_CombinesScheduleAndAutoStop()
         {
             var s = new Settings { ScheduleEnabled = true, AutoStopEnabled = true };

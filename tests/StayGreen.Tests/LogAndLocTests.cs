@@ -194,6 +194,31 @@ namespace StayGreen.Tests
         }
 
         [Fact]
+        public void CommandLineHelp_MentionsEveryOption_InBothLanguages()
+        {
+            string old = Loc.Language;
+            try
+            {
+                foreach (string lang in new[] { "de", "en" })
+                {
+                    Loc.Language = lang;
+                    string help = Loc.T("cli.help");
+                    foreach (string option in new[]
+                        { "--start", "--no-start", "--minimized", "--settings", "--lang", "--tab", "--selftest", "--autostart", "--help" })
+                        Assert.True(help.Contains(option), lang + ": " + option);
+                }
+
+                Loc.Language = "de";
+                Assert.Contains("für", Loc.T("cli.help"));      // echte Umlaute, keine Umschreibung ("fuer")
+                Assert.DoesNotContain("fuer", Loc.T("cli.help"));
+            }
+            finally
+            {
+                Loc.Language = old;
+            }
+        }
+
+        [Fact]
         public void Days_AreDefinedForAllSevenDays()
         {
             for (int i = 0; i < 7; i++)
