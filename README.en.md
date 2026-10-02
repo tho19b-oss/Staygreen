@@ -132,7 +132,7 @@ tools/        make_icon.py generates the icon, make_manifests.py the Scoop and w
 docs/         Images for the README and the guide to signing (German)
 ```
 
-**Update screenshots:** *Actions → Screenshots → Run workflow* with *commit* ticked. The workflow starts the EXE on Windows and stores the images under `docs/images/`. With *extra* it also produces scrolled check images of the lower card areas (meant as an artifact only).
+**Update screenshots:** *Actions → Screenshots → Run workflow* with *commit* ticked. The workflow starts the EXE on Windows and stores the images under `docs/images/`. With *extra* it also produces scrolled check images of the lower card areas (meant as an artifact only) and a list in the log of all input fields with their screen-reader name and their value after scrolling.
 
 **Publish a release:** in GitHub go to *Actions → CI → Run workflow* and tick *release* (or push a tag such as `v1.2.0`). The version lives in `src/StayGreen/StayGreen.csproj` (`<Version>`); a pushed tag has to match it. If the release already exists the run aborts: raise the version (recommended) or explicitly choose *overwrite*. The release contains the EXE, the portable ZIP, the checksums, the Scoop manifest and the winget manifests.
 

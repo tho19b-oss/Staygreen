@@ -148,7 +148,7 @@ tools/        make_icon.py erzeugt das Icon, make_manifests.py die Scoop- und wi
 docs/         Bilder für die README und die Anleitung zum Signieren
 ```
 
-**Screenshots aktualisieren:** *Actions → Screenshots → Run workflow* mit Haken bei *commit*. Der Workflow startet die EXE auf Windows und legt die Bilder unter `docs/images/` ab. Mit *extra* entstehen zusätzlich gescrollte Prüfbilder der unteren Kartenbereiche (nur als Artefakt gedacht).
+**Screenshots aktualisieren:** *Actions → Screenshots → Run workflow* mit Haken bei *commit*. Der Workflow startet die EXE auf Windows und legt die Bilder unter `docs/images/` ab. Mit *extra* entstehen zusätzlich gescrollte Prüfbilder der unteren Kartenbereiche (nur als Artefakt gedacht) und im Protokoll eine Liste aller Eingabefelder mit ihrem Namen für Screenreader und ihrem Wert nach dem Scrollen.
 
 **Release veröffentlichen:** In GitHub unter *Actions → CI → Run workflow* die Option *Release* anhaken (oder ein Tag `v1.2.0` pushen). Die Version steht in `src/StayGreen/StayGreen.csproj` (`<Version>`); ein gepushter Tag muss dazu passen. Existiert das Release schon, bricht der Lauf ab: Erhöhe die Version (empfohlen) oder wähle ausdrücklich *overwrite*. Das Release enthält die EXE, das portable ZIP, die Prüfsummen, das Scoop-Manifest und die winget-Manifeste.
 
