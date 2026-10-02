@@ -56,32 +56,56 @@ jobs:
           $screen = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
           "Bildschirm: $($screen.Width)x$($screen.Height)"
 
-          # Nur im Zusatzlauf: Gibt die Bedienelemente per UI Automation im Protokoll aus (Typ | Name | Klasse | Wert),
+          # MSAA (IAccessible): Das lesen Screenreader wie NVDA und JAWS; Narrator nutzt UI Automation und darunter dieselben
+          # Angaben. Der verwaltete UI-Automation-Client zeigt dagegen nur den Fenstertext und wuerde AccessibleName verdecken.
+          Add-Type -AssemblyName Accessibility
+          Add-Type -ReferencedAssemblies 'Accessibility' -TypeDefinition @'
+          using System;
+          using System.Runtime.InteropServices;
+          using Accessibility;
+          public static class Msaa {
+            [DllImport("oleacc.dll")] static extern int AccessibleObjectFromWindow(IntPtr hwnd, uint dwId, ref Guid riid, [MarshalAs(UnmanagedType.Interface)] out object ppvObject);
+            public static string NameOf(IntPtr hwnd) {
+              Guid iid = new Guid("618736E0-3C3D-11CF-810C-00AA00389B71");
+              object o;
+              int hr = AccessibleObjectFromWindow(hwnd, 0xFFFFFFFC, ref iid, out o);
+              if (hr != 0 || o == null) return "(kein IAccessible, hr=" + hr + ")";
+              try { return ((IAccessible)o).get_accName(0); }
+              catch (Exception e) { return "(" + e.GetType().Name + ")"; }
+            }
+          }
+          '@
+
+          # Nur im Zusatzlauf: Gibt die Eingabefelder und Knoepfe im Protokoll aus (Klasse | Fenstertext | MSAA-Name | Wert),
           # damit sich pruefen laesst
-          # - ob alle Bedienelemente einen Namen haben (Screenreader): Zeilen mit "OHNE NAMEN",
+          # - ob alle Bedienelemente einen Namen fuer Screenreader haben (MSAA-Name, Zeilen mit "OHNE NAMEN"),
           # - ob nach dem Scrollen noch die Ausgangswerte der Auswahl- und Zahlenfelder stehen (das Mausrad ueber einem
           #   Feld darf nichts verstellen, die Seite scrollt stattdessen).
           # Fehler beim Auslesen werden gezaehlt und gemeldet, nicht verschluckt.
           function Probe-Fields($win, $name) {
             $trueCond = [System.Windows.Automation.Condition]::TrueCondition
-            $fieldTypes = @('ComboBox', 'Spinner', 'CheckBox', 'Button', 'Edit')
             $all = $win.FindAll($scope::Descendants, $trueCond)
             $unnamed = 0
             $errors = 0
             $lines = @()
             foreach ($e in $all) {
               try {
-                $short = $e.Current.ControlType.ProgrammaticName.Replace('ControlType.', '')
-                $label = $e.Current.Name
+                $class = $e.Current.ClassName
+                if ($class -notmatch 'BUTTON|COMBOBOX|EDIT|SysDateTimePick32|LISTBOX') { continue }
+                $text = $e.Current.Name
+                $hwnd = [IntPtr]$e.Current.NativeWindowHandle
+                $msaa = ''
+                if ($hwnd -ne [IntPtr]::Zero) { $msaa = [Msaa]::NameOf($hwnd) }
                 $value = ''
                 $pattern = $null
                 if ($e.TryGetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern, [ref]$pattern)) { $value = $pattern.Current.Value }
-                $isField = $fieldTypes -contains $short
-                if ($isField -and [string]::IsNullOrWhiteSpace($label)) { $unnamed++; $lines += ('    OHNE NAMEN: {0} | Klasse {1}' -f $short, $e.Current.ClassName) }
-                $lines += ('    {0} | {1} | {2} | {3}' -f $short, $label, $e.Current.ClassName, $value)
+                $short = $class -replace 'WindowsForms10\.', '' -replace '\.app\..*', ''
+                $mark = ''
+                if ([string]::IsNullOrWhiteSpace($msaa) -or $msaa -like '(*') { $unnamed++; $mark = 'OHNE NAMEN ' }
+                $lines += ('    {0}{1} | Text=[{2}] | MSAA=[{3}] | Wert=[{4}]' -f $mark, $short, $text, $msaa, $value)
               } catch { $errors++ }
             }
-            "  {0}: {1} Elemente, {2} Fehler beim Auslesen, {3} Bedienelemente ohne Namen" -f $name, $all.Count, $errors, $unnamed
+            "  {0}: {1} Elemente, {2} Fehler beim Auslesen, {3} Bedienelemente ohne MSAA-Namen" -f $name, $all.Count, $errors, $unnamed
             $lines
           }
 
