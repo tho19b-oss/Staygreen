@@ -78,7 +78,7 @@ jobs:
                 if ($e.TryGetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern, [ref]$pattern)) { $value = $pattern.Current.Value }
                 $isField = $fieldTypes -contains $short
                 if ($isField -and [string]::IsNullOrWhiteSpace($label)) { $unnamed++; $lines += ('    OHNE NAMEN: {0} | Klasse {1}' -f $short, $e.Current.ClassName) }
-                if ($isField) { $lines += ('    {0} | {1} | {2} | {3}' -f $short, $label, $e.Current.ClassName, $value) }
+                $lines += ('    {0} | {1} | {2} | {3}' -f $short, $label, $e.Current.ClassName, $value)
               } catch { $errors++ }
             }
             "  {0}: {1} Elemente, {2} Fehler beim Auslesen, {3} Bedienelemente ohne Namen" -f $name, $all.Count, $errors, $unnamed
