@@ -95,6 +95,16 @@ jobs:
               [void][WinApi]::SetCursorPos([int]($br.Left + $br.Width / 2), [int]($br.Top + $br.Height * 0.7))
               for ($k = 0; $k -lt $scroll; $k++) { [WinApi]::mouse_event(0x0800, 0, 0, -120, [UIntPtr]::Zero); Start-Sleep -Milliseconds 80 }
               Start-Sleep -Milliseconds 600
+              # Pruefung: Das Mausrad ueber einem Auswahlfeld darf dessen Wert nicht aendern (die Seite scrollt stattdessen).
+              # Ausgabe im Protokoll: Name des Felds und gewaehlter Eintrag, hier muessen noch die Ausgangswerte stehen.
+              $comboType = [System.Windows.Automation.ControlType]::ComboBox
+              $comboCond = New-Object System.Windows.Automation.PropertyCondition($AE::ControlTypeProperty, $comboType)
+              foreach ($combo in $win.FindAll($scope::Descendants, $comboCond)) {
+                $valuePattern = $null
+                if ($combo.TryGetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern, [ref]$valuePattern)) {
+                  "  {0}: Auswahlfeld '{1}' = '{2}'" -f $name, $combo.Current.Name, $valuePattern.Current.Value
+                }
+              }
             }
             Start-Sleep -Milliseconds 800
             $r = [WinApi]::FrameBounds($h)

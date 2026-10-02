@@ -59,6 +59,7 @@ namespace StayGreen.UI
         readonly HotkeyWindow _hotkey = new HotkeyWindow();
         readonly AutoStopCoordinator _autoStop;
         readonly CommandPipe _pipe = new CommandPipe();
+        readonly WheelGuard _wheelGuard = new WheelGuard();
         readonly List<PendingEvent> _pending = new List<PendingEvent>();
 
         MainForm _form;
@@ -92,6 +93,7 @@ namespace StayGreen.UI
             _autoStop = new AutoStopCoordinator(_settings, new WarningPrompt(_settings), () => DateTime.Now);
 
             WindowIcon = IconFactory.Create(Theme.Green, Glyph.Check, 32);
+            Application.AddMessageFilter(_wheelGuard); // Mausrad ueber einem Feld scrollt die Seite, statt Werte zu aendern
 
             // Der Autostart-Eintrag in der Registry ist die Wahrheit (der Nutzer kann ihn auch ausserhalb aendern).
             _settings.StartWithWindows = Autostart.IsEnabled();
@@ -779,6 +781,7 @@ namespace StayGreen.UI
         {
             if (disposing)
             {
+                Application.RemoveMessageFilter(_wheelGuard);
                 _timer.Dispose();
                 if (_form != null && !_form.IsDisposed) _form.Dispose();
                 if (WindowIcon != null) WindowIcon.Dispose();

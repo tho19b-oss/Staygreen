@@ -88,7 +88,10 @@ namespace StayGreen.Core
                 info.Title = Loc.T("status.active");
                 DateTime? nextAt = engine.NextActivityAt;
                 int seconds = nextAt.HasValue ? Math.Max(0, (int)Math.Ceiling((nextAt.Value - now).TotalSeconds)) : 0;
-                info.Detail = Loc.T("status.active.detail", seconds, engine.ActivityCount, Format.Duration(engine.Elapsed(now)));
+                string elapsed = Format.Duration(engine.Elapsed(now));
+                info.Detail = engine.ActivityCount == 1
+                    ? Loc.T("status.active.detail.one", seconds, elapsed)
+                    : Loc.T("status.active.detail", seconds, engine.ActivityCount, elapsed);
             }
             return info;
         }
