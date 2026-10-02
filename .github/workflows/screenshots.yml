@@ -63,7 +63,15 @@ jobs:
             foreach ($w in $AE::RootElement.FindAll($scope::Children, $cond)) {
               if ($w.Current.Name -eq 'StayGreen' -and $null -eq $win) { $win = $w }
             }
-            if ($null -eq $win) { Stop-Process -Id $proc.Id -Force; throw "Fenster '$name' nicht gefunden" }
+            if ($null -eq $win) {
+              # Diagnose: ist das Programm abgestuerzt? Dann steht der Grund in error.log (neben der .ini).
+              $proc.Refresh()
+              "Prozess beendet: $($proc.HasExited)" + $(if ($proc.HasExited) { " (Exit-Code $($proc.ExitCode))" } else { '' })
+              $errLog = Join-Path $env:RUNNER_TEMP 'error.log'
+              if (Test-Path $errLog) { '--- error.log ---'; Get-Content $errLog } else { 'Keine error.log vorhanden' }
+              if (-not $proc.HasExited) { Stop-Process -Id $proc.Id -Force }
+              throw "Fenster '$name' nicht gefunden"
+            }
 
             $h = [IntPtr]$win.Current.NativeWindowHandle
             [void][WinApi]::SetForegroundWindow($h)

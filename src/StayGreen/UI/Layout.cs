@@ -106,6 +106,7 @@ namespace StayGreen.UI
     abstract class LayoutPanel : Panel, IMeasurable
     {
         bool _topDivider;
+        bool _inLayout;
 
         protected LayoutPanel()
         {
@@ -135,7 +136,13 @@ namespace StayGreen.UI
         protected override void OnLayout(LayoutEventArgs levent)
         {
             base.OnLayout(levent);
-            DoLayout();
+
+            // Das Setzen der Kind-Groessen loest erneut ein Layout dieses Containers aus; das aeussere DoLayout
+            // platziert ohnehin alle Kinder, deshalb genuegt es, die verschachtelte Anfrage zu ignorieren.
+            if (_inLayout) return;
+            _inLayout = true;
+            try { DoLayout(); }
+            finally { _inLayout = false; }
         }
 
         protected override void OnPaint(PaintEventArgs e)
@@ -464,6 +471,8 @@ namespace StayGreen.UI
     /// <summary>Scrollbarer Bereich fuer eine Registerkarte; ordnet seinen Inhalt auf die verfuegbare Breite an.</summary>
     sealed class ScrollHost : Panel
     {
+        bool _busy;
+
         public ScrollHost(Stack content)
         {
             Content = content;
@@ -482,24 +491,35 @@ namespace StayGreen.UI
 
         public Stack Content { get; private set; }
 
+        /// <summary>
+        /// Ordnet den Inhalt auf die tatsaechlich sichtbare Breite an. Erscheint oder verschwindet dadurch der
+        /// senkrechte Balken, aendert sich die sichtbare Breite; dann wird noch einmal angeordnet. So entsteht nie
+        /// ein waagerechter Balken.
+        /// </summary>
         public void Relayout()
         {
-            if (!Visible || Width <= 0) return;
-
-            int width = Width;
-            int height = Content.MeasureHeight(width);
-            if (height > Height)
+            if (_busy || !Visible || ClientSize.Width <= 0) return;
+            _busy = true;
+            try
             {
-                // Es erscheint ein senkrechter Balken: seine Breite gleich abziehen, sonst entstuende ein waagerechter.
-                width = Math.Max(1, Width - SystemInformation.VerticalScrollBarWidth);
-                height = Content.MeasureHeight(width);
-            }
+                for (int pass = 0; pass < 3; pass++)
+                {
+                    int width = ClientSize.Width;
+                    int height = Content.MeasureHeight(width);
 
-            var bounds = new Rectangle(0, AutoScrollPosition.Y, width, height);
-            bool sizeChanged = Content.Size != bounds.Size;
-            Content.Bounds = bounds;
-            if (!sizeChanged) Content.PerformLayout();
-            AutoScrollMinSize = new Size(0, height);
+                    var bounds = new Rectangle(0, AutoScrollPosition.Y, width, height);
+                    bool sizeChanged = Content.Size != bounds.Size;
+                    Content.Bounds = bounds;
+                    if (!sizeChanged) Content.PerformLayout();
+                    AutoScrollMinSize = new Size(0, height);
+
+                    if (ClientSize.Width == width) break;
+                }
+            }
+            finally
+            {
+                _busy = false;
+            }
         }
 
         /// <summary>Scrollt um einen Mausrad-Schritt (positiv = nach oben).</summary>
@@ -512,6 +532,12 @@ namespace StayGreen.UI
         protected override void OnResize(EventArgs eventargs)
         {
             base.OnResize(eventargs);
+            Relayout();
+        }
+
+        protected override void OnClientSizeChanged(EventArgs e)
+        {
+            base.OnClientSizeChanged(e);
             Relayout();
         }
 
