@@ -10,6 +10,10 @@ Erzeugt aus Version und SHA256 der EXE die Paketbeschreibungen fuer die Verteilu
 Nur Standardbibliothek, laeuft in der CI (ubuntu) und lokal:
 
   python3 tools/make_manifests.py --version 1.2.0 --sha256 <hash der StayGreen.exe> --out dist/manifests
+  python3 tools/make_manifests.py --version 1.2.0 --sums dist/SHA256SUMS.txt --out dist/manifests
+
+Mit --sums wird der Hash der StayGreen.exe aus der Pruefsummen-Datei gelesen. Die entsteht auf Windows und hat
+CRLF-Zeilenenden; das Lesen kommt damit zurecht.
 """
 import argparse
 import json
@@ -96,12 +100,26 @@ def winget_files(version, sha256):
     }
 
 
+def sha_from_sums(path, filename="StayGreen.exe"):
+    """Liest den Hash von <filename> aus einer Datei im Format "<hash>  <name>" je Zeile (LF oder CRLF)."""
+    with open(path, encoding="utf-8-sig") as f:
+        for line in f:
+            parts = line.split()   # trennt an jedem Leerraum, auch am \r am Zeilenende
+            if len(parts) == 2 and parts[1].lstrip("*") == filename:
+                return parts[0]
+    raise SystemExit("In %s steht kein Hash fuer %s" % (path, filename))
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--version", required=True, help="Version ohne fuehrendes v, z. B. 1.2.0")
-    parser.add_argument("--sha256", required=True, help="SHA256 der StayGreen.exe (64 Hex-Zeichen)")
+    source = parser.add_mutually_exclusive_group(required=True)
+    source.add_argument("--sha256", help="SHA256 der StayGreen.exe (64 Hex-Zeichen)")
+    source.add_argument("--sums", help="Pruefsummen-Datei (SHA256SUMS.txt), aus der der Hash der StayGreen.exe gelesen wird")
     parser.add_argument("--out", required=True, help="Ausgabeordner")
     args = parser.parse_args(argv)
+    if args.sums:
+        args.sha256 = sha_from_sums(args.sums)
 
     if not re.fullmatch(r"\d+\.\d+\.\d+", args.version):
         parser.error("Version muss die Form 1.2.3 haben")

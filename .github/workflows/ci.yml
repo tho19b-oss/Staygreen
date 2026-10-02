@@ -39,6 +39,11 @@ jobs:
         run: |
           python3 tools/make_manifests.py --version 0.0.1 --sha256 "$(printf 'a%.0s' {1..64})" --out "$RUNNER_TEMP/manifests"
           python3 -c "import json,sys; json.load(open(sys.argv[1], encoding='utf-8'))" "$RUNNER_TEMP/manifests/staygreen.json"
+          # Die Pruefsummen-Datei kommt von Windows (CRLF): Der Hash muss trotzdem gefunden werden.
+          A=$(printf 'a%.0s' {1..64}); B=$(printf 'b%.0s' {1..64})
+          printf '%s  StayGreen.exe\r\n%s  StayGreen-portable.zip\r\n' "$A" "$B" > "$RUNNER_TEMP/SHA256SUMS.txt"
+          python3 tools/make_manifests.py --version 0.0.1 --sums "$RUNNER_TEMP/SHA256SUMS.txt" --out "$RUNNER_TEMP/manifests-sums"
+          grep -q "\"hash\": \"$A\"" "$RUNNER_TEMP/manifests-sums/staygreen.json"
 
   windows:
     name: Windows-Build, Selbsttest und Start-Test
@@ -201,9 +206,12 @@ jobs:
             exit 1
           fi
 
+          # SHA256SUMS.txt entsteht auf Windows mit CRLF. Fuer das Release (und "sha256sum -c") auf LF umstellen.
+          tr -d '\r' < dist/SHA256SUMS.txt > dist/SHA256SUMS.lf
+          mv dist/SHA256SUMS.lf dist/SHA256SUMS.txt
+
           # Paket-Manifeste (Scoop, winget) mit der echten Pruefsumme dieser EXE
-          SHA=$(awk '$2 == "StayGreen.exe" {print $1}' dist/SHA256SUMS.txt)
-          python3 tools/make_manifests.py --version "$VERSION" --sha256 "$SHA" --out dist/manifests
+          python3 tools/make_manifests.py --version "$VERSION" --sums dist/SHA256SUMS.txt --out dist/manifests
           cp dist/manifests/staygreen.json dist/staygreen.json
           (cd dist/manifests && zip -qr ../StayGreen-winget-manifests.zip winget)
 
