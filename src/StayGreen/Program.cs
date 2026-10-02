@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 using System.Windows.Forms;
 using StayGreen.Core;
 using StayGreen.Platform;
@@ -15,7 +16,9 @@ namespace StayGreen
 
             if (cmd.Help)
             {
-                MessageBox.Show(CommandLine.HelpText, "StayGreen", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                // Die Einstellungsdatei wird hier bewusst nicht gelesen: --lang oder die Windows-Sprache genuegen.
+                Loc.Language = Loc.Resolve(cmd.Language ?? "auto", CultureInfo.CurrentUICulture);
+                MessageBox.Show(Loc.T("cli.help"), Loc.T("app.title"), MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return 0;
             }
 

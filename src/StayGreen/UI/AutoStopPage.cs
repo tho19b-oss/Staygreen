@@ -19,10 +19,10 @@ namespace StayGreen.UI
             Width = 72,
             Anchor = AnchorStyles.Left,
         };
+        // Kurzes Datum nach den Windows-Regionseinstellungen (nicht fest deutsch, auch wenn die Oberflaeche englisch ist).
         readonly DateTimePicker _onceDate = new DateTimePicker
         {
-            Format = DateTimePickerFormat.Custom,
-            CustomFormat = "dd.MM.yyyy",
+            Format = DateTimePickerFormat.Short,
             Width = 120,
         };
         readonly DateTimePicker _onceTime = new DateTimePicker

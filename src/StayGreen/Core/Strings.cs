@@ -21,6 +21,28 @@ namespace StayGreen.Core
                 "StayGreen läuft im Infobereich weiter. Ein Klick auf das Symbol öffnet das Fenster.",
                 "StayGreen keeps running in the notification area. Click the icon to open the window." },
 
+            new[] { "cli.help",
+                "StayGreen [Optionen]\r\n\r\n"
+                + "  --start            Aktivhalten sofort starten\r\n"
+                + "  --no-start         Aktivhalten nicht automatisch starten\r\n"
+                + "  --minimized        Nur im Infobereich starten (ohne Fenster)\r\n"
+                + "  --settings <Datei> Andere Einstellungsdatei verwenden\r\n"
+                + "  --lang de|en       Sprache für diesen Start\r\n"
+                + "  --tab <Name>       Registerkarte öffnen: activity, schedule, stop, system (oder 0-3)\r\n"
+                + "  --selftest [Datei] Selbsttest ausführen und Ergebnis speichern\r\n"
+                + "  --autostart        (intern) Start durch den Windows-Autostart\r\n"
+                + "  --help             Diese Hilfe\r\n",
+                "StayGreen [options]\r\n\r\n"
+                + "  --start            Start holding right away\r\n"
+                + "  --no-start         Do not start holding automatically\r\n"
+                + "  --minimized        Start in the notification area only (no window)\r\n"
+                + "  --settings <file>  Use a different settings file\r\n"
+                + "  --lang de|en       Language for this start\r\n"
+                + "  --tab <name>       Open a tab: activity, schedule, stop, system (or 0-3)\r\n"
+                + "  --selftest [file]  Run the self-test and save the result\r\n"
+                + "  --autostart        (internal) Start by Windows autostart\r\n"
+                + "  --help             This help\r\n" },
+
             // ---- Status ----
             new[] { "status.stopped", "Gestoppt", "Stopped" },
             new[] { "status.stopped.detail",

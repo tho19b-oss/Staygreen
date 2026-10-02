@@ -110,7 +110,7 @@ namespace StayGreen.Core
                 : Loc.T("plan.autostop.expired");
         }
 
-        /// <summary>"heute 17:00", "morgen 08:00", "Mo 08:00" oder "12.10. 08:00".</summary>
+        /// <summary>"heute 17:00", "morgen 08:00", "Mo 08:00" und "12.10. 08:00" (englisch: "Oct 12 08:00").</summary>
         public static string When(DateTime when, DateTime now)
         {
             string time = ScheduleRule.FormatTime(when.TimeOfDay);
@@ -118,7 +118,10 @@ namespace StayGreen.Core
             if (days == 0) return Loc.T("when.today") + " " + time;
             if (days == 1) return Loc.T("when.tomorrow") + " " + time;
             if (days > 1 && days < 7) return Loc.DayShort(ScheduleRule.DayIndex(when.DayOfWeek)) + " " + time;
-            return when.ToString("dd.MM.", CultureInfo.InvariantCulture) + " " + time;
+            string date = Loc.Language == "en"
+                ? when.ToString("MMM d", CultureInfo.InvariantCulture)
+                : when.ToString("dd.MM.", CultureInfo.InvariantCulture);
+            return date + " " + time;
         }
     }
 

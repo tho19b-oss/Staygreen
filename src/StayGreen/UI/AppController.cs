@@ -379,16 +379,11 @@ namespace StayGreen.UI
             {
                 if (e.Button == MouseButtons.Left) ShowMainWindow();
             };
-            ApplyTrayTexts(tray);
+            ApplyTrayTexts();
             return tray;
         }
 
         void ApplyTrayTexts()
-        {
-            ApplyTrayTexts(_tray);
-        }
-
-        void ApplyTrayTexts(NotifyIcon tray)
         {
             _miShow.Text = Loc.T("tray.show");
             _miAutostart.Text = Loc.T("tray.autostart");

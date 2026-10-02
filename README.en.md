@@ -14,6 +14,10 @@ A tiny Windows app: **one single file** (`StayGreen.exe`, about 140 KB), **no in
 2. If Windows shows "Windows protected your PC" (SmartScreen): **More info → Run anyway**. The EXE is not code-signed, so Windows asks for every new, unknown file. Alternatively right-click the file → *Properties* → tick **Unblock** → *OK* beforehand.
 3. Done. StayGreen starts right away, the lamp at the top of the window turns green and your status stays green. Click **Stop** to end it.
 
+The first time, take a look at the **System** tab: there you choose whether StayGreen starts with Windows and keeps running in the notification area next to the clock.
+
+> Windows 11 hides new icons in the notification area behind the `^` arrow. Drag the StayGreen icon out if you want to see it permanently.
+
 ## What it looks like
 
 <p align="center">
@@ -89,6 +93,16 @@ dotnet build src/StayGreen/StayGreen.csproj -c Release        # produces bin/Rel
 ```
 
 The EXE targets **.NET Framework 4.7.2**, which is built into Windows 10 (1803+) and Windows 11. That is why it needs no runtime installation and stays a single file.
+
+```text
+src/StayGreen/
+  Core/       Platform-neutral logic: schedule, auto-stop, settings, engine, texts (tested)
+  Platform/   Windows layer: SendInput, idle time, keep-awake, hotkey, autostart, self-test
+  UI/         User interface (WinForms): main window, tabs, tray, countdown
+tests/        xUnit tests (run on Linux and Windows)
+tools/        make_icon.py generates the icon without third-party dependencies
+.github/      CI: tests, Windows build, self-test, start test, release
+```
 
 **Update screenshots:** *Actions → Screenshots → Run workflow* with *commit* ticked. The workflow starts the EXE on Windows and stores the images under `docs/images/`.
 
