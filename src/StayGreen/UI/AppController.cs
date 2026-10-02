@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Drawing;
 using System.Globalization;
 using System.IO;
+using System.Threading;
 using System.Windows.Forms;
 using Microsoft.Win32;
 using StayGreen.Core;
@@ -12,38 +13,69 @@ using StayGreen.Platform;
 namespace StayGreen.UI
 {
     /// <summary>
-    /// Verdrahtet alles: Einstellungen, Engine, Takt, Auto-Stopp, Tray-Symbol, Hotkey, Hauptfenster.
+    /// Verdrahtet alles: Einstellungen, Engine, Takt, Auto-Stopp, Tray-Symbol, Hotkey, Befehlskanal, Hauptfenster.
     /// Laeuft als ApplicationContext, damit die Anwendung auch ohne sichtbares Fenster (nur Infobereich) lebt.
+    /// Die Logik steckt in der Kernschicht (Engine, AutoStopCoordinator, Planer); hier wird sie nur mit Windows verbunden.
     /// </summary>
     sealed class AppController : ApplicationContext
     {
+        /// <summary>Ein Ereignis aus einem anderen Thread (Sitzung, Energie), das im Takt protokolliert wird.</summary>
+        sealed class PendingEvent
+        {
+            public DateTime Time;
+            public string Kind;
+            public string MessageKey;
+        }
+
+        /// <summary>Zeigt die Vorwarnung vor dem Auto-Stopp als Dialog.</summary>
+        sealed class WarningPrompt : IAutoStopPrompt
+        {
+            readonly Settings _settings;
+
+            public WarningPrompt(Settings settings)
+            {
+                _settings = settings;
+            }
+
+            public AutoStopChoice Ask(DateTime due, string actions)
+            {
+                using (var dialog = new CountdownForm(due, () => DateTime.Now, actions, _settings.AutoStopSnoozeMinutes))
+                {
+                    dialog.ShowDialog();
+                    return dialog.Choice;
+                }
+            }
+        }
+
         readonly CommandLine _cmd;
         readonly SingleInstance _instance;
         readonly Settings _settings;
         readonly IInputBackend _input;
-        readonly ISystemActions _actions = new WindowsSystemActions();
+        readonly WindowsSystemActions _actions = new WindowsSystemActions();
         readonly HolderEngine _engine;
         readonly ProtocolLog _log;
-        readonly MainForm _form;
-        readonly NotifyIcon _tray;
-        readonly Timer _timer = new Timer { Interval = 1000 };
+        readonly TrayController _tray;
+        readonly System.Windows.Forms.Timer _timer = new System.Windows.Forms.Timer { Interval = 1000 };
         readonly HotkeyWindow _hotkey = new HotkeyWindow();
-        readonly Dictionary<StatusKind, Icon> _icons = new Dictionary<StatusKind, Icon>();
+        readonly AutoStopCoordinator _autoStop;
+        readonly CommandPipe _pipe = new CommandPipe();
+        readonly WheelGuard _wheelGuard = new WheelGuard();
+        readonly List<PendingEvent> _pending = new List<PendingEvent>();
 
-        ToolStripMenuItem _miHeader;
-        ToolStripMenuItem _miToggle;
-        ToolStripMenuItem _miShow;
-        ToolStripMenuItem _miAutostart;
-        ToolStripMenuItem _miExit;
-
-        DateTime? _autoStopDue;
-        bool _executingStop;
+        MainForm _form;
+        SynchronizationContext _ui;
         bool _exiting;
         bool _balloonShown;
+        bool _noticePending;
         volatile bool _sessionLocked;
-        StatusKind? _shownKind;
-        string _shownTooltip;
+        DateTime _lastPrune = DateTime.MinValue;
+        string _appliedTheme;
         string _hotkeySignature;
+        HotkeyState _hotkeyState = HotkeyState.Off;
+        string _hotkeyDescription = "";
+        string _hotkeyCharacter;
+        string _storageError;
+        string _shownLogError;
 
         public AppController(CommandLine cmd, SingleInstance instance)
         {
@@ -52,46 +84,56 @@ namespace StayGreen.UI
 
             _settings = SettingsStore.Load();
             ApplyLanguage();
+            _appliedTheme = _cmd.Theme ?? _settings.Theme;
+            Theme.Apply(_appliedTheme);
 
             _input = PlatformInfo.IsWindows ? (IInputBackend)new Win32Input() : new DemoInput();
             _log = new ProtocolLog(_settings, () => SettingsStore.DefaultLogPath);
-            _engine = new HolderEngine(_input, _settings, (time, kind, message) => _log.Write(time, kind, message));
+            _engine = new HolderEngine(_input, _settings, (time, kind, message) => _log.Write(time, kind, message), _actions);
+            _autoStop = new AutoStopCoordinator(_settings, new WarningPrompt(_settings), () => DateTime.Now);
 
-            CreateIcons();
             WindowIcon = IconFactory.Create(Theme.Green, Glyph.Check, 32);
+            Application.AddMessageFilter(_wheelGuard); // Mausrad ueber einem Feld scrollt die Seite, statt Werte zu aendern
 
             // Der Autostart-Eintrag in der Registry ist die Wahrheit (der Nutzer kann ihn auch ausserhalb aendern).
             _settings.StartWithWindows = Autostart.IsEnabled();
             if (_settings.StartWithWindows && Autostart.CurrentCommand() != Autostart.ExpectedCommand)
                 Autostart.Set(true); // EXE wurde verschoben: Eintrag auf den neuen Pfad umbiegen
 
-            _form = new MainForm(this);
-            _form.ActivityPage.TestRequested = TestInput;
-            _form.SystemPage.DefaultLogPath = () => SettingsStore.DefaultLogPath;
-            _form.SystemPage.OpenFolderRequested = OpenSettingsFolder;
-            _form.SystemPage.OpenLogRequested = OpenLogFile;
-            _form.LoadSettings(_settings);
-            _form.SelectTab(_cmd.Tab);
-            IntPtr unused = _form.Handle; // Handle jetzt anlegen, damit Signale der zweiten Instanz ankommen
+            _form = CreateForm(_cmd.Tab);
+            _ui = SynchronizationContext.Current;   // steht erst nach dem ersten Fenster bereit
 
-            _tray = BuildTray();
+            _tray = new TrayController();
+            _tray.ToggleRequested += () => Toggle(Loc.T("reason.tray"));
+            _tray.ShowRequested += ShowMainWindow;
+            _tray.ResumeRequested += ResumeFromPause;
+            _tray.SkipTodayRequested += ToggleSkipToday;
+            _tray.ExitRequested += ExitApp;
+            _tray.PauseRequested += minutes => PauseFor(minutes, Loc.T("reason.tray"));
+            _tray.AutostartRequested += enabled =>
+            {
+                _settings.StartWithWindows = enabled;
+                OnSettingsChanged();
+                _form.LoadSettings(_settings);
+            };
 
             _hotkey.Pressed += () => Toggle(Loc.T("reason.hotkey"));
             ApplyHotkey();
 
             HookSystemEvents();
-            _instance.Listen(() =>
-            {
-                try { _form.BeginInvoke(new Action(ShowMainWindow)); }
-                catch { }
-            });
+            _instance.Listen(() => Post(ShowMainWindow));
+            _pipe.Listen(OnRemoteLine);
 
             _timer.Tick += (o, e) => OnTick();
 
             DateTime now = DateTime.Now;
-            RescheduleAutoStop(now);
-            bool start = _cmd.Start || (_settings.StartHoldingOnLaunch && !_cmd.NoStart);
+            DateRange.Prune(_settings.Exceptions, now);
+            _autoStop.Reschedule(now);
+
+            bool start = _cmd.StartRequested || (_settings.StartHoldingOnLaunch && !_cmd.NoStartRequested);
             if (start) _engine.Start(now, Loc.T(_cmd.Autostart ? "reason.autostart" : "reason.launch"));
+            if (_cmd.Remote != null && _cmd.Remote.Action == RemoteAction.Pause && _engine.Running)
+                _engine.Pause(now, TimeSpan.FromMinutes(_cmd.Remote.Minutes), Loc.T("reason.command"));
 
             bool quiet = _cmd.Autostart || _cmd.Minimized || _settings.StartMinimized;
             if (!quiet)
@@ -120,7 +162,74 @@ namespace StayGreen.UI
             get { return _engine; }
         }
 
-        // ------------------------------------------------------------------ Start / Stopp
+        /// <summary>Fuehrt eine Aktion auf dem Oberflaechen-Thread aus (auch von anderen Threads aus aufrufbar).</summary>
+        void Post(Action action)
+        {
+            SynchronizationContext ui = _ui;
+            if (ui == null) return;
+            ui.Post(state =>
+            {
+                if (_exiting) return;
+                try { action(); }
+                catch (Exception ex) { CrashLog.Write(ex); }
+            }, null);
+        }
+
+        // ------------------------------------------------------------------ Fenster aufbauen
+
+        MainForm CreateForm(int tab)
+        {
+            var form = new MainForm(this);
+            form.ActivityPage.TestRequested = TestInput;
+            form.ActivityPage.PauseRequested = minutes => PauseFor(minutes, Loc.T("reason.manual"));
+            form.SystemPage.DefaultLogPath = () => SettingsStore.DefaultLogPath;
+            form.SystemPage.OpenFolderRequested = OpenSettingsFolder;
+            form.SystemPage.OpenLogRequested = OpenLogFile;
+            form.SystemPage.OpenReleasePageRequested = OpenReleasePage;
+            form.LoadSettings(_settings);
+            form.SelectTab(tab);
+            IntPtr unused = form.Handle; // Handle jetzt anlegen, damit Signale der zweiten Instanz und Post() ankommen
+            return form;
+        }
+
+        /// <summary>
+        /// Baut das Hauptfenster neu auf (nach einem Wechsel der Darstellung): Viele Bedienelemente uebernehmen ihre Farben
+        /// beim Anlegen, ein Neuaufbau ist der zuverlaessigste Weg. Position, Groesse und Seite bleiben erhalten.
+        /// </summary>
+        void RebuildForm()
+        {
+            if (_exiting) return;
+
+            MainForm old = _form;
+            bool visible = old.Visible;
+            Rectangle bounds = old.WindowState == FormWindowState.Normal ? old.Bounds : old.RestoreBounds;
+            int tab = old.SelectedTab;
+
+            Theme.Apply(_appliedTheme);
+            _form = CreateForm(tab);
+            if (visible)
+            {
+                _form.StartPosition = FormStartPosition.Manual;
+                _form.Bounds = bounds;
+                ShowMainWindow();
+            }
+
+            old.Hide();
+            old.Dispose();
+            PushStatuses();
+            RefreshUi(DateTime.Now);
+        }
+
+        /// <summary>Wechselt die Darstellung, wenn Einstellung oder Windows (Hell/Dunkel, Kontrastdesign) es verlangen.</summary>
+        void ApplyThemeIfChanged()
+        {
+            string wanted = _cmd.Theme ?? _settings.Theme;
+            if (wanted == _appliedTheme && Theme.Resolve(_appliedTheme) == Theme.Mode) return;
+            _appliedTheme = wanted;
+            Post(RebuildForm);
+        }
+
+        // ------------------------------------------------------------------ Start / Stopp / Pause
 
         public void Start(string reason)
         {
@@ -140,9 +249,70 @@ namespace StayGreen.UI
             else Start(reason);
         }
 
+        /// <summary>Haelt das Aktivhalten fuer ein paar Minuten an; danach geht es von selbst weiter.</summary>
+        public void PauseFor(int minutes, string reason)
+        {
+            if (!_engine.Running) return;
+            _engine.Pause(DateTime.Now, TimeSpan.FromMinutes(minutes), reason);
+            RefreshUi(DateTime.Now);
+        }
+
+        public void ResumeFromPause()
+        {
+            _engine.Resume(DateTime.Now);
+            RefreshUi(DateTime.Now);
+        }
+
+        /// <summary>"Heute aussetzen": Der Zeitplan beginnt heute kein Fenster mehr (oder wieder, wenn er schon ausgesetzt war).</summary>
+        void ToggleSkipToday()
+        {
+            DateTime today = DateTime.Today;
+            if (_settings.IsExcluded(today)) DateRange.Include(_settings.Exceptions, today);
+            else DateRange.Exclude(_settings.Exceptions, today);
+            SaveSettings();
+            _form.LoadSettings(_settings);
+            RefreshUi(DateTime.Now);
+        }
+
         bool TestInput()
         {
-            return _input.SendActivity(_settings.Mode, _settings.MousePixels);
+            return _input.SendActivity(_settings.Mode, _settings.MousePixels, _settings.InputKey);
+        }
+
+        // ------------------------------------------------------------------ Befehle von einem zweiten Start
+
+        /// <summary>Wird auf dem Hintergrundthread des Befehlskanals aufgerufen.</summary>
+        void OnRemoteLine(string line)
+        {
+            RemoteCommand command;
+            if (!RemoteCommand.TryParse(line, out command)) return;
+            Post(() => ApplyRemote(command));
+        }
+
+        void ApplyRemote(RemoteCommand command)
+        {
+            string reason = Loc.T("reason.command");
+            switch (command.Action)
+            {
+                case RemoteAction.Start:
+                    if (!_engine.Running) Start(reason);
+                    break;
+                case RemoteAction.Stop:
+                    if (_engine.Running) Stop(reason);
+                    break;
+                case RemoteAction.Toggle:
+                    Toggle(reason);
+                    break;
+                case RemoteAction.Pause:
+                    PauseFor(command.Minutes, reason);
+                    break;
+                case RemoteAction.Resume:
+                    ResumeFromPause();
+                    break;
+                default:
+                    ShowMainWindow();
+                    break;
+            }
         }
 
         // ------------------------------------------------------------------ Takt
@@ -153,7 +323,15 @@ namespace StayGreen.UI
             DateTime now = DateTime.Now;
             try
             {
+                DrainPendingEvents();
+                PruneExceptionsDaily(now);
+
+                bool wasRunning = _engine.Running;
                 _engine.Tick(now);
+                if (wasRunning && !_engine.Running && _engine.StoppedAutomatically)
+                    _tray.ShowBalloon(Loc.T("app.title"), Loc.T("balloon.maxruntime", Format.Duration(TimeSpan.FromHours(_settings.MaxRuntimeHours))),
+                        ToolTipIcon.Info);
+
                 CheckAutoStop(now);
             }
             catch (Exception ex)
@@ -163,80 +341,67 @@ namespace StayGreen.UI
             RefreshUi(now);
         }
 
-        // ------------------------------------------------------------------ Auto-Stopp
-
-        void RescheduleAutoStop(DateTime now)
+        /// <summary>Raeumt vergangene Urlaubstage einmal pro Tag auf.</summary>
+        void PruneExceptionsDaily(DateTime now)
         {
-            _autoStopDue = AutoStopPlanner.NextDue(_settings, now);
+            if (now.Date == _lastPrune) return;
+            _lastPrune = now.Date;
+            int before = _settings.Exceptions.Count;
+            DateRange.Prune(_settings.Exceptions, now);
+            if (_settings.Exceptions.Count == before) return;
+            SaveSettings();
+            _form.LoadSettings(_settings);
         }
+
+        // ------------------------------------------------------------------ Auto-Stopp
 
         void CheckAutoStop(DateTime now)
         {
-            if (_executingStop || !_autoStopDue.HasValue || now < _autoStopDue.Value) return;
-
-            DateTime due = _autoStopDue.Value;
-            bool missed = AutoStopPlanner.IsMissed(due, now);
-
-            // Naechsten Termin zuerst festlegen: der Countdown-Dialog pumpt Nachrichten, der Takt laeuft weiter.
-            if (_settings.AutoStopTiming == StopTiming.Once)
+            AutoStopResult result = _autoStop.Tick(now);
+            if (_autoStop.SettingsChanged)
             {
-                _settings.AutoStopEnabled = false;
-                SettingsStore.Save(_settings);
+                SaveSettings();
                 _form.LoadSettings(_settings);
             }
-            RescheduleAutoStop(now);
 
-            if (missed)
+            DateTime after = DateTime.Now;
+            switch (result)
             {
-                _log.Write(now, "AUTOSTOP", Loc.T("log.autostop.missed"));
-                return;
+                case AutoStopResult.Execute:
+                    ExecuteAutoStop(after);
+                    break;
+                case AutoStopResult.Missed:
+                    _log.Write(after, "AUTOSTOP", Loc.T("log.autostop.missed"));
+                    break;
+                case AutoStopResult.Cancelled:
+                    _log.Write(after, "AUTOSTOP", Loc.T("log.autostop.cancelled"));
+                    break;
+                case AutoStopResult.Snoozed:
+                    if (_autoStop.LastSnoozedTo.HasValue)
+                        _log.Write(after, "AUTOSTOP", Loc.T("log.autostop.snoozed", _settings.AutoStopSnoozeMinutes,
+                            StatusBuilder.When(_autoStop.LastSnoozedTo.Value, after)));
+                    break;
             }
-            ExecuteAutoStop(now);
         }
 
         void ExecuteAutoStop(DateTime now)
         {
-            _executingStop = true;
-            try
+            StopPlan plan = StopPlan.FromSettings(_settings);
+            _log.Write(now, "AUTOSTOP", Loc.T("log.autostop", plan.Describe()));
+            if (_engine.Running) _engine.Stop(now, Loc.T("reason.autostop"));
+            RefreshUi(now);
+
+            StopOutcome outcome = StopExecutor.Execute(plan, _actions);
+
+            DateTime after = DateTime.Now;
+            if (outcome.TeamsClosed) _log.Write(after, "AUTOSTOP", Loc.T("log.teams.closed"));
+            if (outcome.ShutdownStarted) _log.Write(after, "AUTOSTOP", Loc.T("log.shutdown"));
+            if (outcome.Locked) _log.Write(after, "AUTOSTOP", Loc.T("log.locked"));
+            if (outcome.ExitRequested)
             {
-                StopPlan plan = StopPlan.FromSettings(_settings);
-                _log.Write(now, "AUTOSTOP", Loc.T("log.autostop", DescribePlan(plan)));
-                if (_engine.Running) _engine.Stop(now, Loc.T("reason.autostop"));
-                RefreshUi(now);
-
-                StopOutcome outcome = StopExecutor.Execute(plan, _actions, ConfirmShutdown);
-
-                DateTime after = DateTime.Now;
-                if (outcome.TeamsClosed) _log.Write(after, "AUTOSTOP", Loc.T("log.teams.closed"));
-                if (outcome.ShutdownCancelled) _log.Write(after, "AUTOSTOP", Loc.T("log.shutdown.cancelled"));
-                if (outcome.ShutdownStarted) _log.Write(after, "AUTOSTOP", Loc.T("log.shutdown"));
-                if (outcome.Locked) _log.Write(after, "AUTOSTOP", Loc.T("log.locked"));
-                if (outcome.ExitRequested)
-                {
-                    _log.Write(after, "EXIT", Loc.T("log.exit"));
-                    ExitApp();
-                }
+                _log.Write(after, "EXIT", Loc.T("log.exit"));
+                ExitApp();
             }
-            finally
-            {
-                _executingStop = false;
-            }
-        }
-
-        static string DescribePlan(StopPlan plan)
-        {
-            var parts = new List<string>();
-            if (plan.CloseTeams) parts.Add(Loc.T("plan.action.teams"));
-            if (plan.Lock) parts.Add(Loc.T("plan.action.lock"));
-            if (plan.Shutdown) parts.Add(Loc.T("plan.action.shutdown"));
-            if (plan.ExitApp) parts.Add(Loc.T("plan.action.exit"));
-            return parts.Count == 0 ? Loc.T("plan.action.none") : string.Join(", ", parts);
-        }
-
-        bool ConfirmShutdown()
-        {
-            using (var dialog = new CountdownForm(60))
-                return dialog.ShowDialog() == DialogResult.OK;
         }
 
         // ------------------------------------------------------------------ Einstellungen
@@ -253,18 +418,33 @@ namespace StayGreen.UI
             if (Loc.Language != oldLanguage)
             {
                 _form.ApplyTexts();
-                ApplyTrayTexts();
-                _shownTooltip = null;
+                _tray.ApplyTexts();
+                PushStatuses();
             }
 
             ApplyAutostart();
             ApplyHotkey();
-            RescheduleAutoStop(DateTime.Now);
-            SettingsStore.Save(_settings);
+            _autoStop.Reschedule(DateTime.Now);
+            SaveSettings();
+            _log.Probe();   // Ein neu gewaehlter Protokollpfad zeigt sofort, ob er beschreibbar ist.
 
             // Hat die Pruefung einen Wert korrigiert (z. B. Hotkey ohne Modifier), Felder nachziehen.
             if (adjusted) _form.LoadSettings(_settings);
+            ApplyThemeIfChanged();
             RefreshUi(DateTime.Now);
+        }
+
+        /// <summary>Speichert die Einstellungen; ein Fehler wird einmal als Hinweis gezeigt und bleibt in der Systemseite sichtbar.</summary>
+        void SaveSettings()
+        {
+            bool ok = SettingsStore.Save(_settings);
+            string error = ok ? null : (SettingsStore.LastError ?? "?");
+            if (error == _storageError) return;
+
+            _storageError = error;
+            if (error != null)
+                _tray.ShowBalloon(Loc.T("app.title"), Loc.T("balloon.storage", error), ToolTipIcon.Warning);
+            PushStorageStatus();
         }
 
         void ApplyLanguage()
@@ -294,12 +474,47 @@ namespace StayGreen.UI
             if (signature == _hotkeySignature) return;
             _hotkeySignature = signature;
 
-            bool ok = _hotkey.Register(_settings);
-            string description = HotkeyInfo.Describe(_settings);
-            HotkeyState state = !_settings.HotkeyEnabled || !PlatformInfo.IsWindows
-                ? HotkeyState.Off
-                : (ok ? HotkeyState.Active : HotkeyState.Failed);
-            _form.SystemPage.SetHotkeyStatus(state, description);
+            _hotkeyDescription = HotkeyInfo.Describe(_settings);
+            _hotkeyCharacter = null;
+
+            if (!_settings.HotkeyEnabled || !PlatformInfo.IsWindows)
+            {
+                _hotkey.Unregister();
+                _hotkeyState = HotkeyState.Off;
+            }
+            else
+            {
+                // Strg+Alt ist auf Tastaturen mit AltGr dasselbe wie AltGr: Gibt die Kombination dort ein Zeichen ein,
+                // wuerde der Hotkey es abfangen (z. B. "@" auf Strg+Alt+Q). Dann lieber gar nicht anmelden.
+                string typed = KeyboardLayouts.TypedCharacter(_settings);
+                if (typed != null)
+                {
+                    _hotkey.Unregister();
+                    _hotkeyState = HotkeyState.Conflict;
+                    _hotkeyCharacter = typed;
+                }
+                else
+                {
+                    _hotkeyState = _hotkey.Register(_settings) ? HotkeyState.Active : HotkeyState.Failed;
+                }
+            }
+            PushHotkeyStatus();
+        }
+
+        void PushHotkeyStatus()
+        {
+            _form.SystemPage.SetHotkeyStatus(_hotkeyState, _hotkeyDescription, _hotkeyCharacter);
+        }
+
+        void PushStorageStatus()
+        {
+            _form.SystemPage.SetStorageStatus(_storageError, _shownLogError);
+        }
+
+        void PushStatuses()
+        {
+            PushHotkeyStatus();
+            PushStorageStatus();
         }
 
         // ------------------------------------------------------------------ Anzeige
@@ -309,13 +524,22 @@ namespace StayGreen.UI
             if (_exiting) return;
             try
             {
+                CheckLogError();
+
                 StatusInfo status = StatusBuilder.Build(_engine, _settings, now, _sessionLocked);
-                string plan = StatusBuilder.PlanLine(_settings, now, _autoStopDue, status.Kind != StatusKind.WaitingForWindow);
+                string plan = StatusBuilder.PlanLine(_settings, now, _autoStop.Due, status.Kind != StatusKind.WaitingForWindow);
 
                 if (_form.Visible)
-                    _form.UpdateStatus(status, plan, _engine.Running, now, _autoStopDue);
+                    _form.UpdateStatus(status, plan, _engine.Running, now, _autoStop.Due);
 
-                UpdateTray(status);
+                _tray.Update(status, new TrayState
+                {
+                    Running = _engine.Running,
+                    Paused = _engine.State == HolderState.Paused,
+                    ScheduleActive = _settings.ScheduleActive,
+                    SkippedToday = _settings.IsExcluded(now),
+                    Autostart = _settings.StartWithWindows,
+                });
             }
             catch (Exception ex)
             {
@@ -323,98 +547,16 @@ namespace StayGreen.UI
             }
         }
 
-        void CreateIcons()
+        /// <summary>Ein nicht beschreibbares Protokoll wird einmal gemeldet und dauerhaft an der Einstellung angezeigt.</summary>
+        void CheckLogError()
         {
-            int size = Math.Max(16, SystemInformation.SmallIconSize.Width);
-            Icon gray = IconFactory.Create(Theme.Gray, Glyph.Dash, size);
-            Icon green = IconFactory.Create(Theme.Green, Glyph.Check, size);
-            Icon amber = IconFactory.Create(Theme.Amber, Glyph.Pause, size);
-            Icon red = IconFactory.Create(Theme.Red, Glyph.Exclaim, size);
-            _icons[StatusKind.Stopped] = gray;
-            _icons[StatusKind.Active] = green;
-            _icons[StatusKind.StandingBy] = green;
-            _icons[StatusKind.WaitingForWindow] = amber;
-            _icons[StatusKind.Blocked] = red;
-            _icons[StatusKind.SessionLocked] = red;
-        }
+            string error = _settings.LogEnabled ? _log.LastError : null;
+            if (error == _shownLogError) return;
 
-        NotifyIcon BuildTray()
-        {
-            var menu = new ContextMenuStrip();
-            _miHeader = new ToolStripMenuItem { Enabled = false };
-            _miToggle = new ToolStripMenuItem();
-            _miShow = new ToolStripMenuItem();
-            _miAutostart = new ToolStripMenuItem { CheckOnClick = true };
-            _miExit = new ToolStripMenuItem();
-
-            _miToggle.Click += (o, e) => Toggle(Loc.T("reason.tray"));
-            _miShow.Click += (o, e) => ShowMainWindow();
-            _miAutostart.Click += (o, e) =>
-            {
-                _settings.StartWithWindows = _miAutostart.Checked;
-                OnSettingsChanged();
-                _form.LoadSettings(_settings);
-                _miAutostart.Checked = _settings.StartWithWindows;
-            };
-            _miExit.Click += (o, e) => ExitApp();
-
-            menu.Items.Add(_miHeader);
-            menu.Items.Add(new ToolStripSeparator());
-            menu.Items.Add(_miToggle);
-            menu.Items.Add(_miShow);
-            menu.Items.Add(new ToolStripSeparator());
-            menu.Items.Add(_miAutostart);
-            menu.Items.Add(new ToolStripSeparator());
-            menu.Items.Add(_miExit);
-            menu.Opening += (o, e) => _miAutostart.Checked = _settings.StartWithWindows;
-
-            var tray = new NotifyIcon
-            {
-                ContextMenuStrip = menu,
-                Icon = _icons[StatusKind.Stopped],
-                Text = Loc.T("app.title"),
-                Visible = true,
-            };
-            tray.MouseClick += (o, e) =>
-            {
-                if (e.Button == MouseButtons.Left) ShowMainWindow();
-            };
-            ApplyTrayTexts();
-            return tray;
-        }
-
-        void ApplyTrayTexts()
-        {
-            _miShow.Text = Loc.T("tray.show");
-            _miAutostart.Text = Loc.T("tray.autostart");
-            _miExit.Text = Loc.T("tray.exit");
-            _miToggle.Text = Loc.T(_engine != null && _engine.Running ? "btn.stop" : "btn.start");
-        }
-
-        void UpdateTray(StatusInfo status)
-        {
-            if (_tray == null) return;
-
-            if (_shownKind != status.Kind)
-            {
-                _shownKind = status.Kind;
-                _tray.Icon = _icons[status.Kind];
-            }
-
-            string tooltip = Truncate(Loc.T("app.title") + " – " + status.Title, 63); // Windows erlaubt max. 63 Zeichen
-            if (tooltip != _shownTooltip)
-            {
-                _shownTooltip = tooltip;
-                _tray.Text = tooltip;
-            }
-
-            _miHeader.Text = status.Title;
-            _miToggle.Text = Loc.T(_engine.Running ? "btn.stop" : "btn.start");
-        }
-
-        static string Truncate(string text, int max)
-        {
-            return text.Length <= max ? text : text.Substring(0, max - 1) + "…";
+            _shownLogError = error;
+            if (error != null)
+                _tray.ShowBalloon(Loc.T("app.title"), Loc.T("balloon.log", error), ToolTipIcon.Warning);
+            PushStorageStatus();
         }
 
         // ------------------------------------------------------------------ Fenster
@@ -429,6 +571,27 @@ namespace StayGreen.UI
             _form.TopMost = false;
             _form.Activate();
             RefreshUi(DateTime.Now);
+            ShowNoticeOnce();
+        }
+
+        /// <summary>Beim ersten Oeffnen des Fensters: Hinweis, dass der PC entsperrt bleibt und wo die Nutzung erlaubt sein muss.</summary>
+        void ShowNoticeOnce()
+        {
+            if (_settings.NoticeAccepted || _noticePending) return;
+            _noticePending = true;
+            Post(() =>
+            {
+                try
+                {
+                    MessageBox.Show(_form, Loc.T("notice.text"), Loc.T("notice.title"), MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    _settings.NoticeAccepted = true;
+                    SaveSettings();
+                }
+                finally
+                {
+                    _noticePending = false;
+                }
+            });
         }
 
         void HideToTray(bool showHint)
@@ -438,7 +601,7 @@ namespace StayGreen.UI
             if (showHint && !_balloonShown)
             {
                 _balloonShown = true;
-                _tray.ShowBalloonTip(4000, Loc.T("app.title"), Loc.T("balloon.tray"), ToolTipIcon.Info);
+                _tray.ShowBalloon(Loc.T("app.title"), Loc.T("balloon.tray"), ToolTipIcon.Info);
             }
         }
 
@@ -476,8 +639,8 @@ namespace StayGreen.UI
                 _timer.Stop();
                 if (_engine.Running) _engine.Stop(DateTime.Now, Loc.T("reason.exit"));
                 UnhookSystemEvents();
+                _pipe.Dispose();
                 _hotkey.Dispose();
-                _tray.Visible = false;
                 _tray.Dispose();
             }
             catch (Exception ex)
@@ -520,17 +683,40 @@ namespace StayGreen.UI
             }
         }
 
-        // ------------------------------------------------------------------ Sitzung (Sperren/Entsperren)
+        /// <summary>Oeffnet die Release-Seite im Browser des Nutzers. StayGreen selbst baut keine Verbindung auf.</summary>
+        void OpenReleasePage()
+        {
+            try
+            {
+                Process.Start(new ProcessStartInfo(AppInfo.ReleaseUrl) { UseShellExecute = true });
+            }
+            catch (Exception ex)
+            {
+                CrashLog.Write(ex);
+            }
+        }
+
+        // ------------------------------------------------------------------ Sitzung und Energie (laufen auf eigenen Threads)
 
         void HookSystemEvents()
         {
-            try { SystemEvents.SessionSwitch += OnSessionSwitch; }
+            try
+            {
+                SystemEvents.SessionSwitch += OnSessionSwitch;
+                SystemEvents.PowerModeChanged += OnPowerModeChanged;
+                SystemEvents.UserPreferenceChanged += OnUserPreferenceChanged;
+            }
             catch { }
         }
 
         void UnhookSystemEvents()
         {
-            try { SystemEvents.SessionSwitch -= OnSessionSwitch; }
+            try
+            {
+                SystemEvents.SessionSwitch -= OnSessionSwitch;
+                SystemEvents.PowerModeChanged -= OnPowerModeChanged;
+                SystemEvents.UserPreferenceChanged -= OnUserPreferenceChanged;
+            }
             catch { }
         }
 
@@ -542,23 +728,62 @@ namespace StayGreen.UI
                 case SessionSwitchReason.ConsoleDisconnect:
                 case SessionSwitchReason.RemoteDisconnect:
                     _sessionLocked = true;
+                    Enqueue("LOCK", "log.session.lock");
                     break;
                 case SessionSwitchReason.SessionUnlock:
                 case SessionSwitchReason.ConsoleConnect:
                 case SessionSwitchReason.RemoteConnect:
                 case SessionSwitchReason.SessionLogon:
                     _sessionLocked = false;
+                    Enqueue("UNLOCK", "log.session.unlock");
                     break;
             }
+        }
+
+        void OnPowerModeChanged(object sender, PowerModeChangedEventArgs e)
+        {
+            if (e.Mode == PowerModes.Suspend) Enqueue("SLEEP", "log.sleep");
+            else if (e.Mode == PowerModes.Resume) Enqueue("WAKE", "log.wake");
+        }
+
+        /// <summary>Windows hat Hell/Dunkel oder das Kontrastdesign umgeschaltet: Bei "Automatisch" neu aufbauen.</summary>
+        void OnUserPreferenceChanged(object sender, UserPreferenceChangedEventArgs e)
+        {
+            if (e.Category != UserPreferenceCategory.General && e.Category != UserPreferenceCategory.Color
+                && e.Category != UserPreferenceCategory.Window)
+                return;
+            Post(() =>
+            {
+                if (Theme.Resolve(_appliedTheme) != Theme.Mode) RebuildForm();
+            });
+        }
+
+        /// <summary>Merkt ein Ereignis vom System-Thread vor; protokolliert wird im Takt auf dem Oberflaechen-Thread.</summary>
+        void Enqueue(string kind, string messageKey)
+        {
+            lock (_pending)
+                _pending.Add(new PendingEvent { Time = DateTime.Now, Kind = kind, MessageKey = messageKey });
+        }
+
+        void DrainPendingEvents()
+        {
+            PendingEvent[] items;
+            lock (_pending)
+            {
+                if (_pending.Count == 0) return;
+                items = _pending.ToArray();
+                _pending.Clear();
+            }
+            foreach (PendingEvent item in items) _log.Write(item.Time, item.Kind, Loc.T(item.MessageKey));
         }
 
         protected override void Dispose(bool disposing)
         {
             if (disposing)
             {
+                Application.RemoveMessageFilter(_wheelGuard);
                 _timer.Dispose();
                 if (_form != null && !_form.IsDisposed) _form.Dispose();
-                foreach (Icon icon in _icons.Values) icon.Dispose();
                 if (WindowIcon != null) WindowIcon.Dispose();
             }
             base.Dispose(disposing);

@@ -13,6 +13,12 @@ namespace StayGreen.Core
 
         /// <summary>Gestartet, wartet aber auf das naechste Zeitfenster.</summary>
         WaitingForWindow,
+
+        /// <summary>Vom Nutzer fuer eine Weile angehalten; laeuft danach von selbst weiter.</summary>
+        Paused,
+
+        /// <summary>Gestartet, aber Teams laeuft nicht (nur mit der Option "nur wenn Teams laeuft").</summary>
+        WaitingForTeams,
     }
 
     /// <summary>
@@ -22,21 +28,34 @@ namespace StayGreen.Core
     /// </summary>
     public sealed class HolderEngine
     {
+        /// <summary>So viele fehlgeschlagene Eingaben in Folge gelten als "blockiert".</summary>
+        public const int BlockedThreshold = 2;
+
+        /// <summary>So oft wird (hoechstens) nachgesehen, ob Teams laeuft; das Auflisten der Prozesse kostet etwas.</summary>
+        public static readonly TimeSpan TeamsCheckInterval = TimeSpan.FromSeconds(5);
+
         readonly IInputBackend _input;
         readonly Settings _settings;
         readonly Action<DateTime, string, string> _log;
+        readonly ITeamsProbe _teams;
 
         bool _running;
         bool _awakeApplied;
         DateTime _nextActivity;
+        DateTime? _pausedUntil;
+        DateTime? _activeSince;
+        DateTime _teamsCheckedAt = DateTime.MinValue;
+        bool _teamsRunning = true;
 
-        public HolderEngine(IInputBackend input, Settings settings, Action<DateTime, string, string> log)
+        public HolderEngine(IInputBackend input, Settings settings, Action<DateTime, string, string> log,
+            ITeamsProbe teams = null)
         {
-            if (input == null) throw new ArgumentNullException("input");
-            if (settings == null) throw new ArgumentNullException("settings");
+            if (input == null) throw new ArgumentNullException(nameof(input));
+            if (settings == null) throw new ArgumentNullException(nameof(settings));
             _input = input;
             _settings = settings;
             _log = log;
+            _teams = teams;
             State = HolderState.Stopped;
         }
 
@@ -61,6 +80,15 @@ namespace StayGreen.Core
 
         /// <summary>Zuletzt gemessene Leerlaufzeit (nur im intelligenten Modus gemessen).</summary>
         public TimeSpan LastIdle { get; private set; }
+
+        /// <summary>Wann die Pause endet (nur im Zustand <see cref="HolderState.Paused"/>).</summary>
+        public DateTime? PausedUntil
+        {
+            get { return _running && State == HolderState.Paused ? _pausedUntil : null; }
+        }
+
+        /// <summary>True, wenn der letzte Stopp von der maximalen Laufzeit ausging (nicht vom Nutzer).</summary>
+        public bool StoppedAutomatically { get; private set; }
 
         /// <summary>Wann die naechste Eingabe geplant ist (nur sinnvoll im Zustand Active ohne Bereitschaft).</summary>
         public DateTime? NextActivityAt
@@ -88,6 +116,9 @@ namespace StayGreen.Core
             ActivityCount = 0;
             ConsecutiveFailures = 0;
             StandingBy = false;
+            StoppedAutomatically = false;
+            _pausedUntil = null;
+            _activeSince = now;
             State = HolderState.Active;
             _nextActivity = now;
             Log(now, "START", reason);
@@ -101,10 +132,37 @@ namespace StayGreen.Core
             _running = false;
             State = HolderState.Stopped;
             StandingBy = false;
+            _pausedUntil = null;
+            _activeSince = null;
             ApplyAwake(false);
             Log(now, "STOP", string.IsNullOrEmpty(reason)
                 ? Loc.T("log.runtime", Format.Duration(runtime))
                 : reason + " - " + Loc.T("log.runtime", Format.Duration(runtime)));
+        }
+
+        /// <summary>
+        /// Haelt das Aktivhalten fuer die angegebene Dauer an (keine Eingabe, kein Wach-Halten); danach geht es von
+        /// selbst weiter. Wirkt nur, solange gestartet ist.
+        /// </summary>
+        public void Pause(DateTime now, TimeSpan duration, string reason)
+        {
+            if (!_running) return;
+            if (duration <= TimeSpan.Zero)
+            {
+                Resume(now);
+                return;
+            }
+            _pausedUntil = now + duration;
+            Log(now, "PAUSE", Loc.T("log.pause_manual", ScheduleRule.FormatTime(_pausedUntil.Value.TimeOfDay), reason));
+            Tick(now);
+        }
+
+        /// <summary>Beendet eine Pause sofort.</summary>
+        public void Resume(DateTime now)
+        {
+            if (!_running || !_pausedUntil.HasValue) return;
+            _pausedUntil = null;
+            Tick(now);
         }
 
         /// <summary>Wird einmal pro Sekunde aufgerufen.</summary>
@@ -112,25 +170,29 @@ namespace StayGreen.Core
         {
             if (!_running) return;
 
-            // Ausserhalb der Zeitfenster: nichts tun und auch den PC nicht wach halten.
-            if (_settings.ScheduleActive && !Scheduler.IsActive(now, _settings.Rules))
+            // Sicherheitsnetz: nach der eingestellten Dauer am Stueck von selbst stoppen.
+            if (_settings.MaxRuntimeHours > 0 && _activeSince.HasValue
+                && now - _activeSince.Value >= TimeSpan.FromHours(_settings.MaxRuntimeHours))
             {
-                if (State != HolderState.WaitingForWindow)
-                {
-                    State = HolderState.WaitingForWindow;
-                    StandingBy = false;
-                    ApplyAwake(false);
-                    Log(now, "PAUSE", Loc.T("log.pause_schedule"));
-                }
+                StoppedAutomatically = true;
+                Stop(now, Loc.T("reason.maxruntime", Format.Duration(now - _activeSince.Value)));
+                return;
+            }
+
+            HolderState wanted = Decide(now);
+            if (wanted != HolderState.Active)
+            {
+                if (State != wanted) EnterWaiting(wanted, now);
                 return;
             }
 
             if (State != HolderState.Active)
             {
-                bool resumed = State == HolderState.WaitingForWindow;
+                HolderState from = State;
                 State = HolderState.Active;
                 _nextActivity = now;
-                if (resumed) Log(now, "RESUME", Loc.T("log.resume_schedule"));
+                _activeSince = now;
+                Log(now, "RESUME", Loc.T(ResumeKey(from)));
             }
 
             ApplyAwake(_settings.KeepAwake);
@@ -151,24 +213,84 @@ namespace StayGreen.Core
                 {
                     // Der Nutzer ist selbst aktiv: nichts erzeugen, naechsten Takt wieder pruefen.
                     StandingBy = true;
-                    ConsecutiveFailures = 0;
+                    NoteInputAccepted(now);
                     return;
                 }
             }
 
             StandingBy = false;
-            if (_input.SendActivity(_settings.Mode, _settings.MousePixels))
+            if (_input.SendActivity(_settings.Mode, _settings.MousePixels, _settings.InputKey))
             {
                 LastActivity = now;
                 ActivityCount++;
-                ConsecutiveFailures = 0;
+                NoteInputAccepted(now);
                 if (_settings.KeepAwake) _input.SetKeepAwake(true); // idempotent, sichert gegen Zuruecksetzen ab
             }
             else
             {
                 ConsecutiveFailures++;
+                if (ConsecutiveFailures == BlockedThreshold) Log(now, "BLOCKED", Loc.T("log.blocked"));
             }
             _nextActivity = now.AddSeconds(interval);
+        }
+
+        /// <summary>Entscheidet, in welchem Zustand die Engine jetzt sein soll (Reihenfolge: Pause, Zeitplan, Teams).</summary>
+        HolderState Decide(DateTime now)
+        {
+            if (_pausedUntil.HasValue)
+            {
+                if (now < _pausedUntil.Value) return HolderState.Paused;
+                _pausedUntil = null;
+            }
+
+            // Ausserhalb der Zeitfenster (oder an einem Ausnahmetag): nichts tun und den PC nicht wach halten.
+            if (_settings.ScheduleActive && !Scheduler.IsActive(now, _settings.Rules, _settings.Exceptions))
+                return HolderState.WaitingForWindow;
+
+            if (_settings.OnlyWhileTeamsRuns && !TeamsRunning(now))
+                return HolderState.WaitingForTeams;
+
+            return HolderState.Active;
+        }
+
+        void EnterWaiting(HolderState state, DateTime now)
+        {
+            State = state;
+            StandingBy = false;
+            _activeSince = null;
+            ApplyAwake(false);
+
+            // Die manuelle Pause wurde schon in Pause() protokolliert (mit Grund und Ende).
+            if (state == HolderState.WaitingForWindow) Log(now, "PAUSE", Loc.T("log.pause_schedule"));
+            else if (state == HolderState.WaitingForTeams) Log(now, "PAUSE", Loc.T("log.pause_teams"));
+        }
+
+        static string ResumeKey(HolderState from)
+        {
+            switch (from)
+            {
+                case HolderState.Paused: return "log.resume_pause";
+                case HolderState.WaitingForTeams: return "log.resume_teams";
+                default: return "log.resume_schedule";
+            }
+        }
+
+        bool TeamsRunning(DateTime now)
+        {
+            if (_teams == null) return true;
+            if (now - _teamsCheckedAt >= TeamsCheckInterval || now < _teamsCheckedAt)
+            {
+                _teamsRunning = _teams.IsTeamsRunning();
+                _teamsCheckedAt = now;
+            }
+            return _teamsRunning;
+        }
+
+        /// <summary>Die Eingabe kam an (oder der Nutzer ist selbst aktiv): Fehlerzaehler zuruecksetzen.</summary>
+        void NoteInputAccepted(DateTime now)
+        {
+            if (ConsecutiveFailures >= BlockedThreshold) Log(now, "UNBLOCKED", Loc.T("log.unblocked"));
+            ConsecutiveFailures = 0;
         }
 
         void ApplyAwake(bool on)

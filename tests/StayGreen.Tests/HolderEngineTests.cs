@@ -351,14 +351,23 @@ namespace StayGreen.Tests
         }
     }
 
-    public class StopExecutorTests
+    public class StopExecutorTests : IDisposable
     {
+        public StopExecutorTests()
+        {
+            Loc.Language = "de";
+        }
+
+        public void Dispose()
+        {
+            Loc.Language = "de";
+        }
+
         [Fact]
-        public void Everything_Confirmed_ClosesTeamsAndShutsDownWithoutLocking()
+        public void Everything_ClosesTeamsAndShutsDownWithoutLocking()
         {
             var a = new FakeActions();
-            var o = StopExecutor.Execute(
-                new StopPlan { CloseTeams = true, Shutdown = true, Lock = true, ExitApp = true }, a, () => true);
+            var o = StopExecutor.Execute(new StopPlan { CloseTeams = true, Shutdown = true, Lock = true, ExitApp = true }, a);
             Assert.Equal(new[] { "teams", "shutdown" }, a.Calls.ToArray());
             Assert.True(o.TeamsClosed);
             Assert.True(o.ShutdownStarted);
@@ -367,22 +376,20 @@ namespace StayGreen.Tests
         }
 
         [Fact]
-        public void ShutdownCancelled_StillLocks()
+        public void TeamsAndLock_RunInSafeOrder()
         {
             var a = new FakeActions();
-            var o = StopExecutor.Execute(
-                new StopPlan { CloseTeams = true, Shutdown = true, Lock = true }, a, () => false);
+            var o = StopExecutor.Execute(new StopPlan { CloseTeams = true, Lock = true }, a);
             Assert.Equal(new[] { "teams", "lock" }, a.Calls.ToArray());
-            Assert.True(o.ShutdownCancelled);
-            Assert.False(o.ShutdownStarted);
             Assert.True(o.Locked);
+            Assert.False(o.ShutdownStarted);
         }
 
         [Fact]
-        public void NoConfirmCallback_ShutsDownDirectly()
+        public void Shutdown_RunsDirectly_BecauseTheWarningCameBefore()
         {
             var a = new FakeActions();
-            StopExecutor.Execute(new StopPlan { Shutdown = true }, a, null);
+            StopExecutor.Execute(new StopPlan { Shutdown = true }, a);
             Assert.Equal(new[] { "shutdown" }, a.Calls.ToArray());
         }
 
@@ -390,7 +397,7 @@ namespace StayGreen.Tests
         public void EmptyPlan_DoesNothing()
         {
             var a = new FakeActions();
-            var o = StopExecutor.Execute(new StopPlan(), a, () => true);
+            var o = StopExecutor.Execute(new StopPlan(), a);
             Assert.Empty(a.Calls);
             Assert.False(o.ExitRequested);
         }
@@ -407,13 +414,31 @@ namespace StayGreen.Tests
         }
 
         [Fact]
-        public void ShutdownIsNeverTriggeredByAConfirmCallbackThatIsNotCalled()
+        public void TeamsOnly_NeverShutsDown()
         {
-            bool asked = false;
             var a = new FakeActions();
-            StopExecutor.Execute(new StopPlan { CloseTeams = true }, a, () => { asked = true; return true; });
-            Assert.False(asked);
+            StopExecutor.Execute(new StopPlan { CloseTeams = true }, a);
             Assert.DoesNotContain("shutdown", a.Calls);
+        }
+
+        [Fact]
+        public void NeedsWarning_OnlyForDisruptiveActions()
+        {
+            Assert.False(new StopPlan().NeedsWarning);
+            Assert.False(new StopPlan { ExitApp = true }.NeedsWarning);
+            Assert.True(new StopPlan { CloseTeams = true }.NeedsWarning);
+            Assert.True(new StopPlan { Lock = true }.NeedsWarning);
+            Assert.True(new StopPlan { Shutdown = true }.NeedsWarning);
+        }
+
+        [Fact]
+        public void Describe_ListsTheActionsReadably()
+        {
+            Assert.Equal("Teams beenden, Windows sperren, StayGreen beenden",
+                new StopPlan { CloseTeams = true, Lock = true, ExitApp = true }.Describe());
+            Assert.Equal("nur das Aktivhalten stoppen", new StopPlan().Describe());
+            Loc.Language = "en";
+            Assert.Equal("close Teams, shut down", new StopPlan { CloseTeams = true, Shutdown = true }.Describe());
         }
     }
 }

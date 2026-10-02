@@ -11,12 +11,17 @@ on:
         description: 'GitHub-Release mit der EXE erstellen (Tag v<Version> aus der .csproj)'
         type: boolean
         default: false
+      overwrite:
+        description: 'Nur mit "release": ein schon veroeffentlichtes Release derselben Version UEBERSCHREIBEN (sonst Abbruch; besser Version erhoehen)'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
 
+# Ein Release-Lauf bekommt eine eigene Gruppe, damit ihn ein spaeterer Push nicht mittendrin abbricht.
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.ref }}-${{ (github.event_name == 'workflow_dispatch' && inputs.release) && 'release' || 'normal' }}
   cancel-in-progress: true
 
 jobs:
@@ -30,10 +35,18 @@ jobs:
           dotnet-version: 8.0.x
       - name: Tests
         run: dotnet test tests/StayGreen.Tests -c Release --nologo
+      - name: Paket-Manifeste (Skript-Test)
+        run: |
+          python3 tools/make_manifests.py --version 0.0.1 --sha256 "$(printf 'a%.0s' {1..64})" --out "$RUNNER_TEMP/manifests"
+          python3 -c "import json,sys; json.load(open(sys.argv[1], encoding='utf-8'))" "$RUNNER_TEMP/manifests/staygreen.json"
 
   windows:
     name: Windows-Build, Selbsttest und Start-Test
     runs-on: windows-latest
+    permissions:
+      contents: read
+      id-token: write       # Herkunftsnachweis (Build-Provenance)
+      attestations: write
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-dotnet@v5
@@ -43,7 +56,7 @@ jobs:
       - name: Build (Release)
         run: dotnet build src/StayGreen/StayGreen.csproj -c Release --nologo -p:ContinuousIntegrationBuild=true
 
-      - name: Selbsttest (echte Eingaben, Leerlauf-Zaehler, Hotkey)
+      - name: Selbsttest (echte Eingaben, Leerlauf-Zaehler, Hotkey, Befehlskanal)
         shell: pwsh
         run: |
           $exe = Join-Path $PWD 'src/StayGreen/bin/Release/net472/StayGreen.exe'
@@ -52,34 +65,72 @@ jobs:
           if (Test-Path $out) { Get-Content $out }
           if ($p.ExitCode -ne 0) { throw "Selbsttest fehlgeschlagen (Exit-Code $($p.ExitCode))" }
 
-      - name: Start-Test (Fenster, Tray, Dauerbetrieb, Protokoll)
+      - name: Start-Test (Fenster, Einzelinstanz, Befehle an die laufende Instanz, Protokoll, keine Fehler)
         shell: pwsh
         run: |
           $exe = Join-Path $PWD 'src/StayGreen/bin/Release/net472/StayGreen.exe'
           $ini = Join-Path $env:RUNNER_TEMP 'smoke.ini'
           $log = Join-Path $env:RUNNER_TEMP 'smoke-protokoll.txt'
+          $err = Join-Path $env:RUNNER_TEMP 'error.log'      # liegt neben der .ini
+          Remove-Item $err, $log -ErrorAction SilentlyContinue
           @(
             'StartHoldingOnLaunch=true',
             'SmartIdle=false',
             'IntervalSeconds=5',
+            'NoticeAccepted=true',
             'LogEnabled=true',
             "LogPath=$log"
           ) | Set-Content -Path $ini -Encoding ASCII
 
-          $proc = Start-Process -FilePath $exe -ArgumentList @('--settings', $ini, '--lang', 'de') -PassThru
-          Start-Sleep -Seconds 12
-          $proc.Refresh()
-          if ($proc.HasExited) { throw "StayGreen wurde unerwartet beendet (Exit-Code $($proc.ExitCode))" }
-          "Fenstertitel: '$($proc.MainWindowTitle)'"
-          if ($proc.MainWindowTitle -ne 'StayGreen') { Write-Warning 'Hauptfenster nicht gefunden (nicht-interaktive Sitzung?)' }
+          Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes
+          $AE = [System.Windows.Automation.AutomationElement]
+          $scope = [System.Windows.Automation.TreeScope]
 
-          # Zweiter Start muss sich sofort selbst beenden (Einzelinstanz).
-          $second = Start-Process -FilePath $exe -ArgumentList @('--settings', $ini) -PassThru
-          if (-not $second.WaitForExit(15000)) { $second.Kill(); throw 'Zweite Instanz wurde nicht beendet' }
+          # Zweiter Start mit oder ohne Befehl: muss sich sofort selbst beenden (Einzelinstanz).
+          function Send-StayGreen([string[]]$cmdArgs) {
+            $p = Start-Process -FilePath $exe -ArgumentList (@('--settings', $ini) + $cmdArgs) -PassThru
+            if (-not $p.WaitForExit(15000)) { $p.Kill(); throw "Zweite Instanz ($cmdArgs) wurde nicht beendet" }
+            Start-Sleep -Seconds 2
+          }
+          function Require-Log([string]$pattern) {
+            if (-not (Select-String -Path $log -Pattern $pattern -Quiet)) {
+              Get-Content $log
+              throw "Im Protokoll fehlt: $pattern"
+            }
+          }
+
+          $proc = Start-Process -FilePath $exe -ArgumentList @('--settings', $ini, '--lang', 'de') -PassThru
+
+          # Hauptfenster per UI Automation suchen (bis zu 20 s). Fehlt es, ist der Start kaputt, auch wenn der Prozess noch lebt:
+          # Ausnahmen in der Oberflaeche werden bewusst abgefangen und nur in error.log festgehalten.
+          $found = $false
+          for ($i = 0; $i -lt 40 -and -not $found; $i++) {
+            Start-Sleep -Milliseconds 500
+            $proc.Refresh()
+            if ($proc.HasExited) { throw "StayGreen wurde unerwartet beendet (Exit-Code $($proc.ExitCode))" }
+            $cond = New-Object System.Windows.Automation.PropertyCondition($AE::ProcessIdProperty, $proc.Id)
+            foreach ($w in $AE::RootElement.FindAll($scope::Children, $cond)) {
+              if ($w.Current.Name -eq 'StayGreen') { $found = $true }
+            }
+          }
+          if (-not $found) {
+            if (Test-Path $err) { '--- error.log ---'; Get-Content $err }
+            throw 'Hauptfenster nicht gefunden'
+          }
+          'Hauptfenster gefunden'
+          Start-Sleep -Seconds 6
+          Require-Log 'START'
+
+          Send-StayGreen @()                                  # ohne Befehl: nur Fenster nach vorn
+          Send-StayGreen @('--pause', '10');  Require-Log 'PAUSE\s+Pausiert bis'
+          Send-StayGreen @('--resume');       Require-Log 'RESUME\s+Pause beendet'
+          Send-StayGreen @('--stop');         Require-Log 'STOP\s+Befehlszeile'
+          Send-StayGreen @('--toggle')                        # startet wieder
+          if ((Select-String -Path $log -Pattern 'START').Count -lt 2) { Get-Content $log; throw '--toggle hat das Aktivhalten nicht gestartet' }
 
           Stop-Process -Id $proc.Id -Force
-          if (Test-Path $log) { Get-Content $log } else { throw 'Kein Protokoll geschrieben' }
-          if (-not (Select-String -Path $log -Pattern 'START' -Quiet)) { throw 'START fehlt im Protokoll' }
+          Get-Content $log
+          if (Test-Path $err) { '--- error.log ---'; Get-Content $err; throw 'StayGreen hat eine error.log geschrieben (verschluckte Ausnahme)' }
 
       - name: Paket schnueren
         shell: pwsh
@@ -96,6 +147,17 @@ jobs:
             Set-Content -Path SHA256SUMS.txt -Encoding ASCII
           Get-Content SHA256SUMS.txt
           Pop-Location
+
+      # Beweist, dass die Dateien in diesem Lauf aus diesem Quelltext gebaut wurden (pruefbar mit "gh attestation verify").
+      # Ein Fehler hier (z. B. bei einem Fork ohne Rechte) soll die CI nicht rot faerben.
+      - name: Herkunftsnachweis (Build-Provenance)
+        if: github.event_name != 'pull_request'
+        continue-on-error: true
+        uses: actions/attest-build-provenance@v3
+        with:
+          subject-path: |
+            dist/StayGreen.exe
+            dist/StayGreen-portable.zip
 
       - uses: actions/upload-artifact@v5
         with:
@@ -116,12 +178,39 @@ jobs:
         with:
           name: StayGreen-windows
           path: dist
-      - name: Release erstellen oder aktualisieren
+      - name: Release erstellen
         env:
           GH_TOKEN: ${{ github.token }}
+          OVERWRITE: ${{ inputs.overwrite }}
         run: |
           VERSION=$(sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p' src/StayGreen/StayGreen.csproj | head -n1)
           TAG="v${VERSION}"
+
+          # Ein gepushter Tag muss zur Version in der .csproj passen, sonst haengt unter dem Tag eine andere Version.
+          if [ "$GITHUB_REF_TYPE" = "tag" ] && [ "$GITHUB_REF_NAME" != "$TAG" ]; then
+            echo "::error::Der Tag $GITHUB_REF_NAME passt nicht zur Version $VERSION in StayGreen.csproj (erwartet $TAG)."
+            exit 1
+          fi
+
+          # Ein veroeffentlichtes Release wird nicht still ueberschrieben: Wer die Pruefsumme von vorher kennt, wuerde sonst
+          # eine andere Datei unter demselben Tag bekommen.
+          EXISTS=false
+          if gh release view "$TAG" >/dev/null 2>&1; then EXISTS=true; fi
+          if [ "$EXISTS" = "true" ] && [ "$OVERWRITE" != "true" ]; then
+            echo "::error::Das Release $TAG existiert schon. Erhoehe die Version in StayGreen.csproj (empfohlen) oder starte den Workflow mit der Option 'overwrite'."
+            exit 1
+          fi
+
+          # Paket-Manifeste (Scoop, winget) mit der echten Pruefsumme dieser EXE
+          SHA=$(awk '$2 == "StayGreen.exe" {print $1}' dist/SHA256SUMS.txt)
+          python3 tools/make_manifests.py --version "$VERSION" --sha256 "$SHA" --out dist/manifests
+          cp dist/manifests/staygreen.json dist/staygreen.json
+          (cd dist/manifests && zip -qr ../StayGreen-winget-manifests.zip winget)
+
+          # Hat der Herkunftsnachweis geklappt, steht das in den Release-Notizen.
+          ATTESTED=false
+          if gh attestation verify dist/StayGreen.exe -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then ATTESTED=true; fi
+
           {
             echo "## StayGreen ${VERSION}"
             echo
@@ -134,15 +223,30 @@ jobs:
             echo "Beim ersten Start zeigt Windows eventuell die SmartScreen-Warnung, weil die EXE nicht signiert ist: *Weitere Informationen* → *Trotzdem ausführen*."
             echo "On first start Windows may show a SmartScreen warning because the EXE is unsigned: *More info* → *Run anyway*."
             echo
+            echo "### Per Paketmanager / via package manager"
+            echo '```'
+            echo "scoop install https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/staygreen.json"
+            echo '```'
+            echo "Für winget liegen fertige Manifeste als \`StayGreen-winget-manifests.zip\` bei. / Ready-made winget manifests are attached as \`StayGreen-winget-manifests.zip\`."
+            if [ "$ATTESTED" = "true" ]; then
+              echo
+              echo "### Herkunft prüfen / Verify provenance"
+              echo '```'
+              echo "gh attestation verify StayGreen.exe -R ${GITHUB_REPOSITORY}"
+              echo '```'
+            fi
+            echo
             echo "### SHA256"
             echo '```'
             cat dist/SHA256SUMS.txt
             echo '```'
           } > RELEASE_NOTES.md
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" dist/StayGreen.exe dist/StayGreen-portable.zip dist/SHA256SUMS.txt --clobber
+
+          ASSETS="dist/StayGreen.exe dist/StayGreen-portable.zip dist/SHA256SUMS.txt dist/staygreen.json dist/StayGreen-winget-manifests.zip"
+          if [ "$EXISTS" = "true" ]; then
+            gh release upload "$TAG" $ASSETS --clobber
             gh release edit "$TAG" --notes-file RELEASE_NOTES.md
           else
-            gh release create "$TAG" dist/StayGreen.exe dist/StayGreen-portable.zip dist/SHA256SUMS.txt \
+            gh release create "$TAG" $ASSETS \
               --target "$GITHUB_SHA" --title "StayGreen ${VERSION}" --notes-file RELEASE_NOTES.md
           fi

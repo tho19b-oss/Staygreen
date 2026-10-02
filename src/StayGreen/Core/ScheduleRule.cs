@@ -10,6 +10,8 @@ namespace StayGreen.Core
     /// </summary>
     public sealed class ScheduleRule
     {
+        static readonly bool[] WeekdayMask = { true, true, true, true, true, false, false };
+
         /// <summary>Index 0 = Montag ... 6 = Sonntag.</summary>
         public bool[] Days { get; } = new bool[7];
 
@@ -33,7 +35,7 @@ namespace StayGreen.Core
         /// <summary>Montag-Freitag, <paramref name="from"/> bis <paramref name="to"/>.</summary>
         public static ScheduleRule Weekdays(TimeSpan from, TimeSpan to)
         {
-            return new ScheduleRule(new[] { true, true, true, true, true, false, false }, from, to);
+            return new ScheduleRule(WeekdayMask, from, to);
         }
 
         public static int DayIndex(DayOfWeek day)

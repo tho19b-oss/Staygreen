@@ -8,7 +8,7 @@ namespace StayGreen.Core
     /// <summary>Wie Aktivitaet erzeugt wird.</summary>
     public enum ActivityMode
     {
-        /// <summary>Unauffaelliger Tastendruck (F15, existiert auf keiner Tastatur).</summary>
+        /// <summary>Unauffaelliger Tastendruck (siehe <see cref="ActivityKey"/>).</summary>
         Key,
 
         /// <summary>Winzige Mausbewegung hin und sofort zurueck.</summary>
@@ -18,6 +18,28 @@ namespace StayGreen.Core
         Both,
     }
 
+    /// <summary>
+    /// Welche Taste StayGreen drueckt. F13 bis F24 gibt es auf kaum einer Tastatur; manche Programme (Terminals,
+    /// Makro-Werkzeuge) reagieren trotzdem darauf. Die Umschalttaste aendert in fast allen Programmen nichts.
+    /// Die Reihenfolge ist die Reihenfolge in der Auswahlliste.
+    /// </summary>
+    public enum ActivityKey
+    {
+        F13,
+        F14,
+        F15,
+        F16,
+        F17,
+        F18,
+        F19,
+        F20,
+        F21,
+        F22,
+        F23,
+        F24,
+        Shift,
+    }
+
     public enum StopTiming
     {
         /// <summary>Jeden Tag zur gleichen Uhrzeit.</summary>
@@ -25,6 +47,9 @@ namespace StayGreen.Core
 
         /// <summary>Einmalig zu einem bestimmten Datum und einer Uhrzeit.</summary>
         Once,
+
+        /// <summary>Am Ende des letzten Zeitfensters eines Tages (siehe <see cref="AutoStopPlanner"/>).</summary>
+        ScheduleEnd,
     }
 
     /// <summary>
@@ -38,16 +63,33 @@ namespace StayGreen.Core
         public const int MinMousePixels = 1;
         public const int MaxMousePixels = 20;
 
-        /// <summary>Tasten, die als globaler Hotkey erlaubt sind.</summary>
-        public static readonly string[] HotkeyKeys =
+        /// <summary>
+        /// Teams setzt nach etwa 5 Minuten ohne Eingabe auf "Abwesend". Ab diesem Abstand (in Sekunden) greift das
+        /// Aktivhalten nicht mehr sicher, die Oberflaeche warnt davor.
+        /// </summary>
+        public const int IntervalWarnSeconds = 240;
+
+        public const int MinWarnSeconds = 10;
+        public const int MaxWarnSeconds = 300;
+        public const int MinSnoozeMinutes = 1;
+        public const int MaxSnoozeMinutes = 120;
+        public const int MaxRuntimeHoursLimit = 48;
+        public const int MaxExceptions = 100;
+
+        /// <summary>Tasten, die als globaler Hotkey erlaubt sind: A bis Z und F1 bis F24.</summary>
+        public static readonly string[] HotkeyKeys = BuildHotkeyKeys();
+
+        static string[] BuildHotkeyKeys()
         {
-            "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M",
-            "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z",
-            "F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10", "F11", "F12",
-        };
+            var keys = new List<string>();
+            for (char c = 'A'; c <= 'Z'; c++) keys.Add(c.ToString());
+            for (int i = 1; i <= 24; i++) keys.Add("F" + i.ToString(CultureInfo.InvariantCulture));
+            return keys.ToArray();
+        }
 
         // ---- Aktivitaet ----
         public ActivityMode Mode { get; set; } = ActivityMode.Both;
+        public ActivityKey InputKey { get; set; } = ActivityKey.F15;
         public int IntervalSeconds { get; set; } = 30;
         public int MousePixels { get; set; } = 2;
 
@@ -57,6 +99,12 @@ namespace StayGreen.Core
         /// <summary>PC und Bildschirm wach halten (kein Standby, kein Bildschirmschoner).</summary>
         public bool KeepAwake { get; set; } = true;
 
+        /// <summary>Nur aktiv halten, solange Teams laeuft (sonst Zustand "wartet auf Teams").</summary>
+        public bool OnlyWhileTeamsRuns { get; set; }
+
+        /// <summary>Sicherheitsnetz: nach so vielen Stunden am Stueck automatisch stoppen. 0 = aus.</summary>
+        public int MaxRuntimeHours { get; set; }
+
         // ---- Start und Fenster ----
         public bool StartHoldingOnLaunch { get; set; } = true;
         public bool StartWithWindows { get; set; }
@@ -65,6 +113,12 @@ namespace StayGreen.Core
 
         /// <summary>auto, de oder en.</summary>
         public string Language { get; set; } = "auto";
+
+        /// <summary>auto (folgt Windows), light oder dark.</summary>
+        public string Theme { get; set; } = "auto";
+
+        /// <summary>Der Hinweis zur Nutzung (Erststart) wurde bestaetigt.</summary>
+        public bool NoticeAccepted { get; set; }
 
         // ---- Hotkey ----
         public bool HotkeyEnabled { get; set; } = true;
@@ -78,6 +132,9 @@ namespace StayGreen.Core
         public bool ScheduleEnabled { get; set; }
         public List<ScheduleRule> Rules { get; } = new List<ScheduleRule>();
 
+        /// <summary>Ausnahmetage (Urlaub, Feiertage): An diesen Tagen beginnt kein Zeitfenster.</summary>
+        public List<DateRange> Exceptions { get; } = new List<DateRange>();
+
         // ---- Auto-Stopp ----
         public bool AutoStopEnabled { get; set; }
         public StopTiming AutoStopTiming { get; set; } = StopTiming.Daily;
@@ -87,6 +144,12 @@ namespace StayGreen.Core
         public bool StopLock { get; set; }
         public bool StopShutdown { get; set; }
         public bool StopExitApp { get; set; } = true;
+
+        /// <summary>So viele Sekunden vor dem Auto-Stopp erscheint die Vorwarnung (bei Teams beenden, Sperren, Herunterfahren).</summary>
+        public int AutoStopWarnSeconds { get; set; } = 60;
+
+        /// <summary>Um so viele Minuten laesst sich der Auto-Stopp in der Vorwarnung verschieben.</summary>
+        public int AutoStopSnoozeMinutes { get; set; } = 15;
 
         // ---- Protokoll ----
         public bool LogEnabled { get; set; }
@@ -111,13 +174,32 @@ namespace StayGreen.Core
             get { return StopCloseTeams || StopLock || StopShutdown || StopExitApp; }
         }
 
+        /// <summary>Gilt dieser Tag als Ausnahmetag?</summary>
+        public bool IsExcluded(DateTime day)
+        {
+            return DateRange.ContainsDay(Exceptions, day);
+        }
+
+        /// <summary>True, wenn ein Intervall so lang ist, dass Teams trotz Aktivhalten "Abwesend" anzeigen kann.</summary>
+        public static bool IsIntervalRisky(int seconds)
+        {
+            return seconds >= IntervalWarnSeconds;
+        }
+
         /// <summary>Bringt alle Werte in den erlaubten Bereich (nach dem Laden und nach Benutzereingaben).</summary>
         public void Normalize()
         {
             IntervalSeconds = Clamp(IntervalSeconds, MinInterval, MaxInterval);
             MousePixels = Clamp(MousePixels, MinMousePixels, MaxMousePixels);
+            MaxRuntimeHours = Clamp(MaxRuntimeHours, 0, MaxRuntimeHoursLimit);
+            AutoStopWarnSeconds = Clamp(AutoStopWarnSeconds, MinWarnSeconds, MaxWarnSeconds);
+            AutoStopSnoozeMinutes = Clamp(AutoStopSnoozeMinutes, MinSnoozeMinutes, MaxSnoozeMinutes);
+            if (!Enum.IsDefined(typeof(ActivityKey), InputKey)) InputKey = ActivityKey.F15;
 
             if (Language != "de" && Language != "en") Language = "auto";
+
+            string theme = (Theme ?? "").Trim().ToLowerInvariant();
+            Theme = theme == "light" || theme == "dark" ? theme : "auto";
 
             string key = (HotkeyKey ?? "").Trim().ToUpperInvariant();
             HotkeyKey = Array.IndexOf(HotkeyKeys, key) >= 0 ? key : "G";
@@ -132,6 +214,7 @@ namespace StayGreen.Core
                 AutoStopTime = new TimeSpan(17, 0, 0);
 
             Rules.RemoveAll(r => r == null || !r.IsUsable);
+            DateRange.Normalize(Exceptions);
             LogPath = (LogPath ?? "").Trim();
         }
 
@@ -148,16 +231,21 @@ namespace StayGreen.Core
             Line(sb, "; StayGreen-Einstellungen. Nur bei geschlossenem Programm von Hand aendern.");
             Line(sb, "Version=1");
             Add(sb, "Language", Language);
+            Add(sb, "Theme", Theme);
             Add(sb, "Mode", Mode.ToString());
+            Add(sb, "InputKey", InputKey.ToString());
             Add(sb, "IntervalSeconds", IntervalSeconds);
             Add(sb, "MousePixels", MousePixels);
             Add(sb, "SmartIdle", SmartIdle);
             Add(sb, "KeepAwake", KeepAwake);
+            Add(sb, "OnlyWhileTeamsRuns", OnlyWhileTeamsRuns);
+            Add(sb, "MaxRuntimeHours", MaxRuntimeHours);
 
             Add(sb, "StartHoldingOnLaunch", StartHoldingOnLaunch);
             Add(sb, "StartWithWindows", StartWithWindows);
             Add(sb, "StartMinimized", StartMinimized);
             Add(sb, "MinimizeToTray", MinimizeToTray);
+            Add(sb, "NoticeAccepted", NoticeAccepted);
 
             Add(sb, "HotkeyEnabled", HotkeyEnabled);
             Add(sb, "HotkeyCtrl", HotkeyCtrl);
@@ -169,6 +257,8 @@ namespace StayGreen.Core
             Add(sb, "ScheduleEnabled", ScheduleEnabled);
             foreach (ScheduleRule rule in Rules)
                 Add(sb, "Rule", rule.Serialize());
+            foreach (DateRange range in Exceptions)
+                Add(sb, "Exception", range.Serialize());
 
             Add(sb, "AutoStopEnabled", AutoStopEnabled);
             Add(sb, "AutoStopTiming", AutoStopTiming.ToString());
@@ -180,6 +270,8 @@ namespace StayGreen.Core
             Add(sb, "StopLock", StopLock);
             Add(sb, "StopShutdown", StopShutdown);
             Add(sb, "StopExitApp", StopExitApp);
+            Add(sb, "AutoStopWarnSeconds", AutoStopWarnSeconds);
+            Add(sb, "AutoStopSnoozeMinutes", AutoStopSnoozeMinutes);
 
             Add(sb, "LogEnabled", LogEnabled);
             Add(sb, "LogPath", LogPath);
@@ -212,19 +304,27 @@ namespace StayGreen.Core
             switch (key)
             {
                 case "language": Language = value.ToLowerInvariant(); break;
+                case "theme": Theme = value.ToLowerInvariant(); break;
                 case "mode":
                     ActivityMode mode;
                     if (TryEnum(value, out mode)) Mode = mode;
+                    break;
+                case "inputkey":
+                    ActivityKey inputKey;
+                    if (TryEnum(value, out inputKey)) InputKey = inputKey;
                     break;
                 case "intervalseconds": if (TryInt(value, out i)) IntervalSeconds = i; break;
                 case "mousepixels": if (TryInt(value, out i)) MousePixels = i; break;
                 case "smartidle": if (TryBool(value, out b)) SmartIdle = b; break;
                 case "keepawake": if (TryBool(value, out b)) KeepAwake = b; break;
+                case "onlywhileteamsruns": if (TryBool(value, out b)) OnlyWhileTeamsRuns = b; break;
+                case "maxruntimehours": if (TryInt(value, out i)) MaxRuntimeHours = i; break;
 
                 case "startholdingonlaunch": if (TryBool(value, out b)) StartHoldingOnLaunch = b; break;
                 case "startwithwindows": if (TryBool(value, out b)) StartWithWindows = b; break;
                 case "startminimized": if (TryBool(value, out b)) StartMinimized = b; break;
                 case "minimizetotray": if (TryBool(value, out b)) MinimizeToTray = b; break;
+                case "noticeaccepted": if (TryBool(value, out b)) NoticeAccepted = b; break;
 
                 case "hotkeyenabled": if (TryBool(value, out b)) HotkeyEnabled = b; break;
                 case "hotkeyctrl": if (TryBool(value, out b)) HotkeyCtrl = b; break;
@@ -237,6 +337,10 @@ namespace StayGreen.Core
                 case "rule":
                     ScheduleRule rule;
                     if (ScheduleRule.TryParse(value, out rule)) Rules.Add(rule);
+                    break;
+                case "exception":
+                    DateRange range;
+                    if (DateRange.TryParse(value, out range)) Exceptions.Add(range);
                     break;
 
                 case "autostopenabled": if (TryBool(value, out b)) AutoStopEnabled = b; break;
@@ -258,6 +362,8 @@ namespace StayGreen.Core
                 case "stoplock": if (TryBool(value, out b)) StopLock = b; break;
                 case "stopshutdown": if (TryBool(value, out b)) StopShutdown = b; break;
                 case "stopexitapp": if (TryBool(value, out b)) StopExitApp = b; break;
+                case "autostopwarnseconds": if (TryInt(value, out i)) AutoStopWarnSeconds = i; break;
+                case "autostopsnoozeminutes": if (TryInt(value, out i)) AutoStopSnoozeMinutes = i; break;
 
                 case "logenabled": if (TryBool(value, out b)) LogEnabled = b; break;
                 case "logpath": LogPath = value; break;

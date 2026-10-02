@@ -16,9 +16,13 @@
     <DebugType>none</DebugType>
     <DebugSymbols>false</DebugSymbols>
     <Deterministic>true</Deterministic>
+    <!-- Statische Analyse des SDK im empfohlenen Umfang. Es bleibt bei Warnungen; der Stand ist derzeit warnungsfrei. -->
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <AnalysisLevel>latest</AnalysisLevel>
+    <AnalysisMode>Recommended</AnalysisMode>
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
-    <Version>1.1.0</Version>
-    <FileVersion>1.1.0.0</FileVersion>
+    <Version>1.2.0</Version>
+    <FileVersion>1.2.0.0</FileVersion>
     <Product>StayGreen</Product>
     <AssemblyTitle>StayGreen</AssemblyTitle>
     <Company>StayGreen</Company>

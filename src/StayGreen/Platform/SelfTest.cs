@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -34,11 +35,11 @@ namespace StayGreen.Platform
                 lines.Add((ok ? "OK    " : "FEHLER") + "  " + name + (string.IsNullOrEmpty(detail) ? "" : "  (" + detail + ")"));
             };
 
-            lines.Add("StayGreen Selbsttest " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
+            lines.Add("StayGreen Selbsttest " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture));
             lines.Add("Windows: " + PlatformInfo.IsWindows + ", 64 Bit Prozess: " + (IntPtr.Size == 8)
                       + ", OS: " + Environment.OSVersion.VersionString + ", Runtime: " + Environment.Version);
 
-            int inputSize = Marshal.SizeOf(typeof(NativeMethods.INPUT));
+            int inputSize = Marshal.SizeOf<NativeMethods.INPUT>();
             check("sizeof(INPUT)", inputSize == NativeMethods.ExpectedInputSize,
                 inputSize + " Byte, erwartet " + NativeMethods.ExpectedInputSize);
 
@@ -77,22 +78,35 @@ namespace StayGreen.Platform
             Thread.Sleep(3000);
             TimeSpan idleBefore = input.GetIdleTime();
             check("Leerlauf messbar", idleBefore >= TimeSpan.FromSeconds(2.5),
-                "vorher " + idleBefore.TotalSeconds.ToString("0.0") + " s");
+                "vorher " + idleBefore.TotalSeconds.ToString("0.0", CultureInfo.InvariantCulture) + " s");
 
-            bool key = input.SendActivity(ActivityMode.Key, 2);
+            bool key = input.SendActivity(ActivityMode.Key, 2, ActivityKey.F15);
             check("Tastendruck (F15) angenommen", key, "Win32-Fehler " + input.LastError);
             Thread.Sleep(150);
             TimeSpan afterKey = input.GetIdleTime();
             check("Leerlauf nach Tastendruck zurueckgesetzt", afterKey < TimeSpan.FromSeconds(2),
-                "nachher " + afterKey.TotalSeconds.ToString("0.0") + " s");
+                "nachher " + afterKey.TotalSeconds.ToString("0.0", CultureInfo.InvariantCulture) + " s");
 
             Thread.Sleep(3000);
-            bool mouse = input.SendActivity(ActivityMode.Mouse, 2);
+            bool mouse = input.SendActivity(ActivityMode.Mouse, 2, ActivityKey.F15);
             check("Mausbewegung angenommen", mouse, "Win32-Fehler " + input.LastError);
             Thread.Sleep(150);
             TimeSpan afterMouse = input.GetIdleTime();
             check("Leerlauf nach Mausbewegung zurueckgesetzt", afterMouse < TimeSpan.FromSeconds(2),
-                "nachher " + afterMouse.TotalSeconds.ToString("0.0") + " s");
+                "nachher " + afterMouse.TotalSeconds.ToString("0.0", CultureInfo.InvariantCulture) + " s");
+
+            Thread.Sleep(3000);
+            bool shift = input.SendActivity(ActivityMode.Key, 2, ActivityKey.Shift);
+            check("Umschalt-Tipp angenommen", shift, "Win32-Fehler " + input.LastError);
+            Thread.Sleep(150);
+            TimeSpan afterShift = input.GetIdleTime();
+            check("Leerlauf nach Umschalt-Tipp zurueckgesetzt", afterShift < TimeSpan.FromSeconds(2),
+                "nachher " + afterShift.TotalSeconds.ToString("0.0", CultureInfo.InvariantCulture) + " s");
+
+            check("Tastencodes F13-F24", Win32Input.VirtualKey(ActivityKey.F13) == 0x7C
+                                          && Win32Input.VirtualKey(ActivityKey.F15) == 0x7E
+                                          && Win32Input.VirtualKey(ActivityKey.F24) == 0x87
+                                          && Win32Input.VirtualKey(ActivityKey.Shift) == 0x10, null);
 
             try
             {
@@ -106,8 +120,53 @@ namespace StayGreen.Platform
             }
 
             CheckHotkey(check, input);
+            CheckKeyboardLayouts(check);
+            CheckCommandPipe(check);
             CheckAutostart(check);
             CheckCountdown(check);
+        }
+
+        /// <summary>
+        /// Die Abfrage, ob ein Hotkey ein Zeichen tippen wuerde (AltGr), muss funktionieren: Ohne Umschaltzustand
+        /// liefert eine Buchstabentaste immer ein Zeichen, und die Standardtaste Strg+Alt+G darf nichts melden.
+        /// </summary>
+        static void CheckKeyboardLayouts(Action<string, bool, string> check)
+        {
+            try
+            {
+                string plain = KeyboardLayouts.CharacterFor(0x41, KeyboardLayouts.CurrentLayout(), false, false, false);
+                check("Tastaturbelegung abfragbar (ToUnicodeEx)", plain != null, "Taste A tippt \"" + plain + "\"");
+
+                string typed = KeyboardLayouts.TypedCharacter(new Settings { HotkeyKey = "F9" });
+                check("F-Tasten als Hotkey tippen nie ein Zeichen", typed == null, null);
+            }
+            catch (Exception ex)
+            {
+                check("Tastaturbelegung abfragbar", false, ex.Message);
+            }
+        }
+
+        /// <summary>Der Befehlskanal zur laufenden Instanz: Zeile senden und empfangen (eigener Name, stoert keine echte Instanz).</summary>
+        static void CheckCommandPipe(Action<string, bool, string> check)
+        {
+            try
+            {
+                string name = "StayGreen.SelfTest." + Guid.NewGuid().ToString("N");
+                string received = null;
+                using (var pipe = new CommandPipe(name))
+                {
+                    pipe.Listen(line => received = line);
+                    bool sent = CommandPipe.Send("pause 5", name, 3000);
+                    DateTime end = DateTime.UtcNow.AddSeconds(3);
+                    while (received == null && DateTime.UtcNow < end) Thread.Sleep(20);
+                    check("Befehlskanal sendet und empfaengt", sent && received == "pause 5",
+                        "gesendet: " + sent + ", empfangen: \"" + received + "\"");
+                }
+            }
+            catch (Exception ex)
+            {
+                check("Befehlskanal", false, ex.Message);
+            }
         }
 
         /// <summary>Meldet eine seltene Kombination an, drueckt sie und prueft, dass die Nachricht ankommt.</summary>
@@ -160,15 +219,15 @@ namespace StayGreen.Platform
             }
         }
 
-        /// <summary>Der Countdown vor dem Herunterfahren muss nach Ablauf selbststaendig mit OK schliessen.</summary>
+        /// <summary>Die Vorwarnung vor dem Auto-Stopp muss nach Ablauf selbststaendig schliessen (Ergebnis: Timeout).</summary>
         static void CheckCountdown(Action<string, bool, string> check)
         {
             try
             {
-                using (var dialog = new CountdownForm(1))
+                using (var dialog = new CountdownForm(DateTime.Now.AddSeconds(1), () => DateTime.Now, "Test", 15))
                 {
-                    DialogResult result = dialog.ShowDialog();
-                    check("Countdown-Dialog laeuft ab", result == DialogResult.OK, result.ToString());
+                    dialog.ShowDialog();
+                    check("Vorwarnung laeuft ab", dialog.Choice == AutoStopChoice.Timeout, dialog.Choice.ToString());
                 }
             }
             catch (Exception ex)

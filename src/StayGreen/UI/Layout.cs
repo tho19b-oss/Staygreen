@@ -299,8 +299,28 @@ namespace StayGreen.UI
             set
             {
                 _title.Text = value ?? "";
-                if (_accessory is SwitchBox || _accessory is ComboBox) _accessory.AccessibleName = _title.Text;
+                NameAccessory(_accessory, _title.Text);
             }
+        }
+
+        /// <summary>
+        /// Gibt dem Bedienelement rechts den Titel der Zeile als Namen, damit Screenreader es vorlesen koennen
+        /// (die Beschriftung links ist ein eigenes Element ohne Verbindung). Knoepfe tragen ihre Beschriftung schon.
+        /// </summary>
+        static void NameAccessory(Control accessory, string name)
+        {
+            if (accessory == null) return;
+
+            var inline = accessory as InlineRow;
+            if (inline != null)
+            {
+                foreach (Control child in inline.Controls) NameAccessory(child, name);
+                return;
+            }
+
+            if (accessory is SwitchBox || accessory is ComboBox || accessory is NumericUpDown
+                || accessory is DateTimePicker || accessory is TextBox || accessory is Segmented)
+                accessory.AccessibleName = name;
         }
 
         public string Caption

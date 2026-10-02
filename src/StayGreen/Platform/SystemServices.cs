@@ -13,11 +13,30 @@ namespace StayGreen.Platform
         public static readonly bool IsWindows = Environment.OSVersion.Platform == PlatformID.Win32NT;
     }
 
-    /// <summary>Teams beenden, Windows sperren, Herunterfahren. Auf anderen Systemen bewusst ohne Wirkung.</summary>
-    sealed class WindowsSystemActions : ISystemActions
+    /// <summary>
+    /// Teams beenden, Windows sperren, Herunterfahren und nachsehen, ob Teams laeuft. Auf anderen Systemen
+    /// bewusst ohne Wirkung.
+    /// </summary>
+    sealed class WindowsSystemActions : ISystemActions, ITeamsProbe
     {
         // Neues Teams ("ms-teams.exe") und klassisches Teams ("Teams.exe").
         static readonly string[] TeamsProcesses = { "ms-teams", "Teams" };
+
+        public bool IsTeamsRunning()
+        {
+            if (!PlatformInfo.IsWindows) return true;
+            foreach (string name in TeamsProcesses)
+            {
+                Process[] processes;
+                try { processes = Process.GetProcessesByName(name); }
+                catch { continue; }
+
+                bool any = processes.Length > 0;
+                foreach (Process p in processes) p.Dispose();
+                if (any) return true;
+            }
+            return false;
+        }
 
         public void CloseTeams()
         {
@@ -33,7 +52,7 @@ namespace StayGreen.Platform
                     try
                     {
                         // Erst hoeflich schliessen; Teams versteckt sich aber gern im Infobereich,
-                        // deshalb nach kurzer Wartezeit beenden.
+                        // deshalb nach kurzer Wartezeit beenden. Der Nutzer wurde vorher gewarnt (Auto-Stopp-Vorwarnung).
                         if (!p.CloseMainWindow() || !p.WaitForExit(3000))
                             p.Kill();
                     }
@@ -162,18 +181,37 @@ namespace StayGreen.Platform
             get { return _overridePath ?? Path.Combine(Directory, "settings.ini"); }
         }
 
-        /// <summary>Standardort des Protokolls: im Ordner "Dokumente" (bzw. neben der EXE im portablen Modus).</summary>
+        /// <summary>
+        /// Standardort des Protokolls: im Einstellungsordner (bzw. neben der EXE im portablen Modus). Der Ordner
+        /// "Dokumente" wird auf vielen Firmen-PCs per OneDrive in die Cloud synchronisiert und taugt deshalb nicht
+        /// als Vorgabe. Wer sein Protokoll schon dort hat (Version 1.1 und aelter), behaelt es, damit nichts reisst.
+        /// </summary>
         public static string DefaultLogPath
         {
             get
             {
-                string dir = IsPortable || _overridePath != null
-                    ? Directory
-                    : Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
-                if (string.IsNullOrEmpty(dir)) dir = Directory;
-                return Path.Combine(dir, "StayGreen-Protokoll.txt");
+                const string name = "StayGreen-Protokoll.txt";
+                if (IsPortable || _overridePath != null) return Path.Combine(Directory, name);
+
+                try
+                {
+                    string documents = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+                    if (!string.IsNullOrEmpty(documents))
+                    {
+                        string legacy = Path.Combine(documents, name);
+                        if (File.Exists(legacy)) return legacy;
+                    }
+                }
+                catch
+                {
+                    // Dokumente nicht erreichbar: neuer Standard.
+                }
+                return Path.Combine(Directory, name);
             }
         }
+
+        /// <summary>Meldung des letzten fehlgeschlagenen Speicherns; null, wenn alles gut ging.</summary>
+        public static string LastError { get; private set; }
 
         public static Settings Load()
         {
@@ -189,20 +227,21 @@ namespace StayGreen.Platform
             return Settings.Parse(null);
         }
 
-        /// <summary>Atomar schreiben (erst Temp-Datei, dann ersetzen), damit nie eine halbe Datei bleibt.</summary>
+        /// <summary>
+        /// Atomar schreiben (erst Temp-Datei, dann in einem Schritt ersetzen), damit nie eine halbe oder fehlende
+        /// Datei bleibt. Bei einem Fehler steht der Grund in <see cref="LastError"/>, damit die Oberflaeche ihn zeigen kann.
+        /// </summary>
         public static bool Save(Settings settings)
         {
             try
             {
-                System.IO.Directory.CreateDirectory(Path.GetDirectoryName(FilePath));
-                string tmp = FilePath + ".tmp";
-                File.WriteAllText(tmp, settings.Serialize(), new System.Text.UTF8Encoding(false));
-                if (File.Exists(FilePath)) File.Delete(FilePath);
-                File.Move(tmp, FilePath);
+                AtomicFile.WriteAllText(FilePath, settings.Serialize(), new System.Text.UTF8Encoding(false));
+                LastError = null;
                 return true;
             }
-            catch
+            catch (Exception ex)
             {
+                LastError = ex.Message;
                 return false;
             }
         }

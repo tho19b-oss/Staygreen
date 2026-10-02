@@ -11,19 +11,29 @@ namespace StayGreen.Platform
     /// </summary>
     sealed class Win32Input : IInputBackend
     {
-        static readonly int InputSize = Marshal.SizeOf(typeof(NativeMethods.INPUT));
+        static readonly int InputSize = Marshal.SizeOf<NativeMethods.INPUT>();
 
         /// <summary>Letzter Win32-Fehlercode von SendInput (0 = kein Fehler); fuer Diagnose und Selbsttest.</summary>
         public int LastError { get; private set; }
 
-        public bool SendActivity(ActivityMode mode, int mousePixels)
+        public bool SendActivity(ActivityMode mode, int mousePixels, ActivityKey key)
         {
             bool ok = true;
             if (mode == ActivityMode.Key || mode == ActivityMode.Both)
-                ok &= SendKey(NativeMethods.VK_F15);
+                ok &= SendKey(VirtualKey(key));
             if (mode == ActivityMode.Mouse || mode == ActivityMode.Both)
                 ok &= NudgeMouse(mousePixels);
             return ok;
+        }
+
+        /// <summary>
+        /// Tastencode der gewaehlten Taste: F13 bis F24 liegen lueckenlos ab 0x7C, die Reihenfolge von
+        /// <see cref="ActivityKey"/> entspricht dieser Zaehlung; die Umschalttaste ist VK_SHIFT.
+        /// </summary>
+        public static ushort VirtualKey(ActivityKey key)
+        {
+            if (key == ActivityKey.Shift) return NativeMethods.VK_SHIFT;
+            return (ushort)(NativeMethods.VK_F13 + (int)key);
         }
 
         /// <summary>Drueckt Modifier + Taste und laesst alles wieder los (fuer den Hotkey-Selbsttest).</summary>
@@ -112,7 +122,7 @@ namespace StayGreen.Platform
 
         public TimeSpan GetIdleTime()
         {
-            var info = new NativeMethods.LASTINPUTINFO { cbSize = (uint)Marshal.SizeOf(typeof(NativeMethods.LASTINPUTINFO)) };
+            var info = new NativeMethods.LASTINPUTINFO { cbSize = (uint)Marshal.SizeOf<NativeMethods.LASTINPUTINFO>() };
             if (!NativeMethods.GetLastInputInfo(ref info))
                 return TimeSpan.FromDays(1); // unbekannt: lieber eingreifen als den Status verlieren
 
@@ -121,6 +131,8 @@ namespace StayGreen.Platform
             return TimeSpan.FromMilliseconds(idleMs);
         }
 
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("Usage", "CA1806:Do not ignore method results",
+            Justification = "Schlaegt das Wach-Halten fehl, laeuft der PC normal weiter; es gibt nichts Sinnvolles zu tun.")]
         public void SetKeepAwake(bool keepAwake)
         {
             // ES_CONTINUOUS gilt pro Thread. Alle Aufrufe kommen vom UI-Thread (Timer), daher konsistent.
@@ -138,7 +150,7 @@ namespace StayGreen.Platform
     {
         DateTime _lastInput = DateTime.UtcNow.AddMinutes(-10);
 
-        public bool SendActivity(ActivityMode mode, int mousePixels)
+        public bool SendActivity(ActivityMode mode, int mousePixels, ActivityKey key)
         {
             _lastInput = DateTime.UtcNow;
             return true;
@@ -149,6 +161,8 @@ namespace StayGreen.Platform
             return DateTime.UtcNow - _lastInput;
         }
 
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("Usage", "CA1806:Do not ignore method results",
+            Justification = "Schlaegt das Wach-Halten fehl, laeuft der PC normal weiter; es gibt nichts Sinnvolles zu tun.")]
         public void SetKeepAwake(bool keepAwake)
         {
         }

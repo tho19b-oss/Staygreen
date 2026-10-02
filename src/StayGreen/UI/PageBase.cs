@@ -1,5 +1,6 @@
 using System;
 using System.Drawing;
+using System.Globalization;
 using System.Windows.Forms;
 using StayGreen.Core;
 
@@ -78,6 +79,42 @@ namespace StayGreen.UI
         protected static SwitchBox CreateSwitch()
         {
             return new SwitchBox();
+        }
+
+        /// <summary>Faerbt ein Standard-Eingabefeld passend zum Design (im dunklen Design; sonst bestimmt Windows die Farben).</summary>
+        protected static T Style<T>(T control) where T : Control
+        {
+            Theme.StyleInput(control);
+            return control;
+        }
+
+        /// <summary>Uhrzeitfeld im 24-Stunden-Format mit Auf/Ab-Knoepfen.</summary>
+        protected static DateTimePicker CreateTimePicker()
+        {
+            return Style(new DateTimePicker
+            {
+                Format = DateTimePickerFormat.Custom,
+                CustomFormat = "HH:mm",
+                ShowUpDown = true,
+                Width = Dpi.Px(80),
+            });
+        }
+
+        /// <summary>Datumsfeld im kurzen Datumsformat der Windows-Regionseinstellungen.</summary>
+        protected static DateTimePicker CreateDatePicker()
+        {
+            return Style(new DateTimePicker
+            {
+                Format = DateTimePickerFormat.Short,
+                Width = Dpi.Px(118),
+            });
+        }
+
+        /// <summary>Voller Wochentagsname in der Sprache der Oberflaeche (Index 0 = Montag), z. B. fuer Screenreader.</summary>
+        protected static string DayName(int index)
+        {
+            DayOfWeek day = (DayOfWeek)((index + 1) % 7);
+            return new CultureInfo(Loc.Language).DateTimeFormat.GetDayName(day);
         }
 
         protected static Label CreateLabel()

@@ -40,7 +40,31 @@ namespace StayGreen.Tests
             e.Start(T.Mon(10), "x");
             StatusInfo info = StatusBuilder.Build(e, s, T.Mon(10, 0, 10), false);
             Assert.Equal(StatusKind.Active, info.Kind);
-            Assert.Equal("Nächste Aktion in 20 s · 1 Aktionen · läuft seit 00:00:10", info.Detail);
+            Assert.Equal("Nächste Aktion in 20 s · 1 Aktion · läuft seit 00:00:10", info.Detail);
+        }
+
+        [Fact]
+        public void Active_CounterUsesPluralFromTwoActions()
+        {
+            var s = new Settings { SmartIdle = false, IntervalSeconds = 30 };
+            var e = Engine(s, new FakeInput());
+            e.Start(T.Mon(10), "x");
+            e.Tick(T.Mon(10, 0, 30));
+            Assert.Equal("Nächste Aktion in 30 s · 2 Aktionen · läuft seit 00:00:30",
+                StatusBuilder.Build(e, s, T.Mon(10, 0, 30), false).Detail);
+
+            Loc.Language = "en";
+            Assert.Equal("Next action in 30 s · 2 actions · running for 00:00:30",
+                StatusBuilder.Build(e, s, T.Mon(10, 0, 30), false).Detail);
+            Assert.Equal("Next action in 20 s · 1 action · running for 00:00:10",
+                StatusBuilder.Build(SingleActionEngine(s), s, T.Mon(10, 0, 10), false).Detail);
+        }
+
+        static HolderEngine SingleActionEngine(Settings s)
+        {
+            var e = Engine(s, new FakeInput());
+            e.Start(T.Mon(10), "x");
+            return e;
         }
 
         [Fact]
@@ -235,7 +259,9 @@ namespace StayGreen.Tests
         [InlineData("Z", true, 0x5Au)]
         [InlineData("F1", true, 0x70u)]
         [InlineData("F12", true, 0x7Bu)]
-        [InlineData("F13", false, 0u)]
+        [InlineData("F13", true, 0x7Cu)]
+        [InlineData("F24", true, 0x87u)]
+        [InlineData("F25", false, 0u)]
         [InlineData("F0", false, 0u)]
         [InlineData("1", false, 0u)]
         [InlineData("", false, 0u)]

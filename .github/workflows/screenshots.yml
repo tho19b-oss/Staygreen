@@ -10,6 +10,10 @@ on:
         description: 'Bilder nach docs/images/ einchecken'
         type: boolean
         default: false
+      extra:
+        description: 'Zusatzbilder der unteren Kartenbereiche (gescrollt) zur Pruefung der Oberflaeche'
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -26,6 +30,8 @@ jobs:
         run: dotnet build src/StayGreen/StayGreen.csproj -c Release --nologo
       - name: Screenshots
         shell: powershell
+        env:
+          EXTRA: ${{ inputs.extra }}
         run: |
           Add-Type -AssemblyName System.Windows.Forms, System.Drawing, UIAutomationClient, UIAutomationTypes
           Add-Type -TypeDefinition @'
@@ -35,6 +41,8 @@ jobs:
             [StructLayout(LayoutKind.Sequential)] public struct RECT { public int Left, Top, Right, Bottom; }
             [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);
             [DllImport("user32.dll")] public static extern bool SetWindowPos(IntPtr h, IntPtr after, int x, int y, int cx, int cy, uint flags);
+            [DllImport("user32.dll")] public static extern bool SetCursorPos(int x, int y);
+            [DllImport("user32.dll")] public static extern void mouse_event(uint flags, uint dx, uint dy, int data, UIntPtr extra);
             [DllImport("dwmapi.dll")] public static extern int DwmGetWindowAttribute(IntPtr hwnd, int attr, out RECT rect, int size);
             // Sichtbarer Fensterrahmen ohne den unsichtbaren Schattenrand
             public static RECT FrameBounds(IntPtr hwnd) { RECT r; DwmGetWindowAttribute(hwnd, 9, out r, Marshal.SizeOf(typeof(RECT))); return r; }
@@ -48,9 +56,63 @@ jobs:
           $screen = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
           "Bildschirm: $($screen.Width)x$($screen.Height)"
 
+          # MSAA (IAccessible): Das lesen Screenreader wie NVDA und JAWS; Narrator nutzt UI Automation und darunter dieselben
+          # Angaben. Der verwaltete UI-Automation-Client zeigt dagegen nur den Fenstertext und wuerde AccessibleName verdecken.
+          Add-Type -AssemblyName Accessibility
+          Add-Type -ReferencedAssemblies 'Accessibility' -TypeDefinition @'
+          using System;
+          using System.Runtime.InteropServices;
+          using Accessibility;
+          public static class Msaa {
+            [DllImport("oleacc.dll")] static extern int AccessibleObjectFromWindow(IntPtr hwnd, uint dwId, ref Guid riid, [MarshalAs(UnmanagedType.Interface)] out object ppvObject);
+            public static string NameOf(IntPtr hwnd) {
+              Guid iid = new Guid("618736E0-3C3D-11CF-810C-00AA00389B71");
+              object o;
+              int hr = AccessibleObjectFromWindow(hwnd, 0xFFFFFFFC, ref iid, out o);
+              if (hr != 0 || o == null) return "(kein IAccessible, hr=" + hr + ")";
+              try { return ((IAccessible)o).get_accName(0); }
+              catch (Exception e) { return "(" + e.GetType().Name + ")"; }
+            }
+          }
+          '@
+
+          # Nur im Zusatzlauf: Gibt die Eingabefelder und Knoepfe im Protokoll aus (Klasse | Fenstertext | MSAA-Name | Wert),
+          # damit sich pruefen laesst
+          # - ob alle Bedienelemente einen Namen fuer Screenreader haben (MSAA-Name, Zeilen mit "OHNE NAMEN"),
+          # - ob nach dem Scrollen noch die Ausgangswerte der Auswahl- und Zahlenfelder stehen (das Mausrad ueber einem
+          #   Feld darf nichts verstellen, die Seite scrollt stattdessen).
+          # Fehler beim Auslesen werden gezaehlt und gemeldet, nicht verschluckt.
+          function Probe-Fields($win, $name) {
+            $trueCond = [System.Windows.Automation.Condition]::TrueCondition
+            $all = $win.FindAll($scope::Descendants, $trueCond)
+            $unnamed = 0
+            $errors = 0
+            $lines = @()
+            foreach ($e in $all) {
+              try {
+                $class = $e.Current.ClassName
+                if ($class -notmatch 'BUTTON|COMBOBOX|EDIT|SysDateTimePick32|LISTBOX') { continue }
+                $text = $e.Current.Name
+                $hwnd = [IntPtr]$e.Current.NativeWindowHandle
+                $msaa = ''
+                if ($hwnd -ne [IntPtr]::Zero) { $msaa = [Msaa]::NameOf($hwnd) }
+                $value = ''
+                $pattern = $null
+                if ($e.TryGetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern, [ref]$pattern)) { $value = $pattern.Current.Value }
+                $short = $class -replace 'WindowsForms10\.', '' -replace '\.app\..*', ''
+                $mark = ''
+                if ([string]::IsNullOrWhiteSpace($msaa) -or $msaa -like '(*') { $unnamed++; $mark = 'OHNE NAMEN ' }
+                $lines += ('    {0}{1} | Text=[{2}] | MSAA=[{3}] | Wert=[{4}]' -f $mark, $short, $text, $msaa, $value)
+              } catch { $errors++ }
+            }
+            "  {0}: {1} Elemente, {2} Fehler beim Auslesen, {3} Bedienelemente ohne MSAA-Namen" -f $name, $all.Count, $errors, $unnamed
+            $lines
+          }
+
           # $tall: Fenster vor der Aufnahme auf bis zu 1000 Pixel Hoehe ziehen (soweit der Bildschirm reicht), damit
           # auch lange Seiten ganz zu sehen sind.
-          function Take-Shot($name, $lang, $tab, $extraArgs, $iniLines, $tall) {
+          # $scroll: Anzahl Mausrad-Schritte nach unten vor der Aufnahme (zeigt untere Kartenbereiche).
+          function Take-Shot($name, $lang, $tab, $extraArgs, $iniLines, $tall, $scroll = 0) {
             $ini = Join-Path $env:RUNNER_TEMP "$name.ini"
             $iniLines | Set-Content -Path $ini -Encoding ASCII
             $argList = @('--settings', $ini, '--lang', $lang) + $extraArgs
@@ -81,6 +143,13 @@ jobs:
               [void][WinApi]::SetWindowPos($h, [IntPtr]::Zero, [int]$br.Left, 5, [int]$br.Width, $newHeight, 0x14)
               Start-Sleep -Milliseconds 800
             }
+            if ($scroll -gt 0) {
+              $br = $win.Current.BoundingRectangle
+              [void][WinApi]::SetCursorPos([int]($br.Left + $br.Width / 2), [int]($br.Top + $br.Height * 0.7))
+              for ($k = 0; $k -lt $scroll; $k++) { [WinApi]::mouse_event(0x0800, 0, 0, -120, [UIntPtr]::Zero); Start-Sleep -Milliseconds 80 }
+              Start-Sleep -Milliseconds 600
+              Probe-Fields $win $name
+            }
             Start-Sleep -Milliseconds 800
             $r = [WinApi]::FrameBounds($h)
             $w = $r.Right - $r.Left; $hgt = $r.Bottom - $r.Top
@@ -94,16 +163,28 @@ jobs:
             Start-Sleep -Milliseconds 500
           }
 
-          $base = @('StartHoldingOnLaunch=true')
-          $schedule = @('ScheduleEnabled=true', 'Rule=1111100;08:00;12:00', 'Rule=1111100;13:00;17:00')
+          # NoticeAccepted: Der einmalige Hinweis beim ersten Oeffnen soll das Fenster nicht verdecken.
+          $base = @('StartHoldingOnLaunch=true', 'NoticeAccepted=true')
+          $schedule = @('ScheduleEnabled=true', 'Rule=1111100;08:00;12:00', 'Rule=1111100;13:00;17:00', 'Exception=2026-12-24;2026-12-31')
           $autostop = @('AutoStopEnabled=true', 'AutoStopTiming=Daily', 'AutoStopTime=17:00', 'StopCloseTeams=true', 'StopLock=true', 'StopExitApp=true')
-          Take-Shot 'de-1-aktivitaet' 'de' $null @() $base $false
+          Take-Shot 'de-1-aktivitaet' 'de' $null @() $base $true
           Take-Shot 'de-2-zeitplan' 'de' 'schedule' @() ($base + $schedule) $true
           Take-Shot 'de-3-autostopp' 'de' 'stop' @() ($base + $autostop) $true
           Take-Shot 'de-4-system' 'de' 'system' @() ($base + @('LogEnabled=true', 'LogPath=C:\Users\Anna\Dokumente\StayGreen-Protokoll.txt')) $true
           Take-Shot 'de-5-gestoppt' 'de' $null @('--no-start') $base $false
+          Take-Shot 'de-6-dunkel' 'de' $null @('--theme', 'dark') $base $true
+          Take-Shot 'de-7-pausiert' 'de' $null @('--pause', '30') $base $false
           Take-Shot 'en-1-activity' 'en' $null @() $base $false
           Take-Shot 'en-2-schedule' 'en' 'schedule' @() ($base + $schedule + $autostop) $true
+
+          if ($env:EXTRA -eq 'true') {
+            Take-Shot 'x-aktivitaet-unten' 'de' $null @() $base $true 14
+            Take-Shot 'x-zeitplan-unten' 'de' 'schedule' @() ($base + $schedule) $true 14
+            Take-Shot 'x-autostopp-unten' 'de' 'stop' @() ($base + $autostop) $true 14
+            Take-Shot 'x-system-unten' 'de' 'system' @() ($base + @('LogEnabled=true', 'LogPath=C:\Users\Anna\Dokumente\StayGreen-Protokoll.txt')) $true 14
+            Take-Shot 'x-dunkel-zeitplan' 'de' 'schedule' @('--theme', 'dark') ($base + $schedule) $true
+            Take-Shot 'x-dunkel-autostopp' 'de' 'stop' @('--theme', 'dark') ($base + $autostop) $true
+          }
 
           Get-ChildItem shots | ForEach-Object { "{0}  {1} Byte" -f $_.Name, $_.Length }
       - uses: actions/upload-artifact@v5

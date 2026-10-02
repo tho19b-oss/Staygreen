@@ -261,7 +261,9 @@ namespace StayGreen.Tests
         [Fact]
         public void HotkeyKeys_AreUniqueAndComplete()
         {
-            Assert.Equal(38, Settings.HotkeyKeys.Length);
+            Assert.Equal(26 + 24, Settings.HotkeyKeys.Length);   // A-Z und F1-F24
+            Assert.Contains("F13", Settings.HotkeyKeys);
+            Assert.Contains("F24", Settings.HotkeyKeys);
             Assert.Equal(Settings.HotkeyKeys.Length, new System.Collections.Generic.HashSet<string>(Settings.HotkeyKeys).Count);
         }
     }
