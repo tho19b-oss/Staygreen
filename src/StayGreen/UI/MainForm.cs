@@ -203,6 +203,12 @@ namespace StayGreen.UI
             if (!host.ContainsFocus) host.ScrollByWheel(e.Delta);
         }
 
+        protected override void OnHandleCreated(EventArgs e)
+        {
+            base.OnHandleCreated(e);
+            WindowChrome.ApplyTitleBar(this);
+        }
+
         protected override void OnShown(EventArgs e)
         {
             base.OnShown(e);

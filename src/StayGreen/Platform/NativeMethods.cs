@@ -152,5 +152,9 @@ namespace StayGreen.Platform
         [DllImport("user32.dll", SetLastError = true)]
         [return: MarshalAs(UnmanagedType.Bool)]
         public static extern bool DestroyIcon(IntPtr hIcon);
+
+        /// <summary>Fenstermerkmale des Desktop-Fenster-Managers, hier die dunkle Titelleiste (Attribut 20, ab Windows 10 2004; vorher 19).</summary>
+        [DllImport("dwmapi.dll")]
+        public static extern int DwmSetWindowAttribute(IntPtr hwnd, int attribute, ref int value, int size);
     }
 }

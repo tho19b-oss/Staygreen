@@ -45,6 +45,9 @@ namespace StayGreen.UI
         // Eingabefelder (nur im dunklen Design selbst gefaerbt)
         public static Color InputBack;
 
+        /// <summary>Der gewaehlte Eintrag einer Auswahlleiste (Reiter): im dunklen Design heller als die Leiste.</summary>
+        public static Color SegmentSelected;
+
         // Zarte Hintergruende der Statuskarte
         static Color _tintActive, _tintActiveBorder, _tintWait, _tintWaitBorder;
         static Color _tintBad, _tintBadBorder, _tintStopped, _tintStoppedBorder;
@@ -127,6 +130,7 @@ namespace StayGreen.UI
             Disabled = Color.FromArgb(0xA3, 0xA9, 0xB1);
             OnAccent = Color.White;
             InputBack = Color.White;
+            SegmentSelected = Color.White;
 
             GreenButton = Color.FromArgb(0x1F, 0x7F, 0x47);
             GreenButtonHover = Color.FromArgb(0x19, 0x6B, 0x3B);
@@ -172,6 +176,7 @@ namespace StayGreen.UI
             Disabled = Color.FromArgb(0x6B, 0x72, 0x7A);
             OnAccent = Color.White;
             InputBack = Color.FromArgb(0x2B, 0x30, 0x36);
+            SegmentSelected = Color.FromArgb(0x43, 0x4A, 0x52);
 
             GreenButton = Color.FromArgb(0x23, 0x86, 0x4F);
             GreenButtonHover = Color.FromArgb(0x29, 0x96, 0x58);
@@ -217,6 +222,7 @@ namespace StayGreen.UI
             Disabled = SystemColors.GrayText;
             OnAccent = SystemColors.HighlightText;
             InputBack = SystemColors.Window;
+            SegmentSelected = SystemColors.Window;
 
             GreenButton = SystemColors.Highlight;
             GreenButtonHover = SystemColors.HotTrack;
@@ -699,7 +705,7 @@ namespace StayGreen.UI
     }
 
     /// <summary>Eine Auswahl aus wenigen Moeglichkeiten als Leiste (Registerkarten, "Taeglich/Einmalig").</summary>
-    sealed class Segmented : Control
+    sealed class Segmented : Control, IMeasurable
     {
         string[] _items = Array.Empty<string>();
         int _selected;
@@ -750,6 +756,12 @@ namespace StayGreen.UI
         public int PreferredHeight
         {
             get { return Math.Max(Dpi.Px(38), Font.Height + Dpi.Px(20)); }
+        }
+
+        /// <summary>Als eigene Zeile in einer Spalte fuellt die Leiste die Breite; die Hoehe richtet sich nach der Schrift.</summary>
+        public int MeasureHeight(int width)
+        {
+            return PreferredHeight;
         }
 
         /// <summary>Breite, bei der alle Eintraege bequem Platz haben.</summary>
@@ -955,7 +967,7 @@ namespace StayGreen.UI
                 Rectangle r = SegmentRect(i);
                 bool selected = i == _selected;
                 if (selected)
-                    Metrics.PaintRounded(g, r, Dpi.Px(8), Theme.Card, Theme.CardBorder);
+                    Metrics.PaintRounded(g, r, Dpi.Px(8), Theme.SegmentSelected, Theme.CardBorder);
                 Color fore = selected ? Theme.Text : (i == _hover ? Theme.Text : Theme.MutedStrong);
                 Draw.CenteredText(g, _items[i], Font, r, fore);
                 if (selected && Focused && ShowFocusCues)

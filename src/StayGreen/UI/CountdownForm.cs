@@ -115,6 +115,12 @@ namespace StayGreen.UI
             _text.Text = Loc.T("cd.text", seconds, _actions);
         }
 
+        protected override void OnHandleCreated(EventArgs e)
+        {
+            base.OnHandleCreated(e);
+            WindowChrome.ApplyTitleBar(this);
+        }
+
         protected override void OnShown(EventArgs e)
         {
             base.OnShown(e);

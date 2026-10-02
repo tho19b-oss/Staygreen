@@ -13,7 +13,7 @@ namespace StayGreen.UI
         readonly Card _card = new Card();
 
         readonly SwitchBox _enable = CreateSwitch();
-        readonly Segmented _when = new Segmented { AutoFit = true };
+        readonly Segmented _when = new Segmented();
         readonly DateTimePicker _dailyTime = CreateTimePicker();
         readonly DateTimePicker _onceDate = CreateDatePicker();
         readonly DateTimePicker _onceTime = CreateTimePicker();
@@ -39,6 +39,7 @@ namespace StayGreen.UI
         readonly SettingRow _exitRow;
         readonly SettingRow _warnRow;
         readonly SettingRow _snoozeRow;
+        readonly Stack _whenBarRow;
         readonly Stack _actionsHeaderRow;
         readonly Stack _scheduleHintRow;
         readonly Stack _infoRow;
@@ -49,7 +50,8 @@ namespace StayGreen.UI
             _snooze.Width = Dpi.Px(76);
 
             _enableRow = new SettingRow(_enable);
-            _whenRow = new SettingRow(_when);
+            _whenRow = new SettingRow(null);          // nur die Beschriftung; die Leiste ist zu breit fuer die rechte Seite
+            _whenBarRow = Pad(_when, 0, 10);
             _timeRow = new SettingRow(new InlineRow(_dailyTime));
             _dateRow = new SettingRow(new InlineRow(_onceDate, _onceTime));
             _teamsRow = new SettingRow(_teams);
@@ -64,6 +66,7 @@ namespace StayGreen.UI
 
             _card.AddRow(_enableRow);
             _card.AddRow(_whenRow);
+            _card.Add(_whenBarRow);
             _card.AddRow(_timeRow);
             _card.AddRow(_dateRow);
             _card.Add(_scheduleHintRow);
@@ -164,6 +167,7 @@ namespace StayGreen.UI
             var timing = (StopTiming)Math.Max(0, _when.SelectedIndex);
             bool needsWarning = _teams.Checked || _lock.Checked || _shutdown.Checked;
             _whenRow.Visible = on;
+            _whenBarRow.Visible = on;
             _timeRow.Visible = on && timing == StopTiming.Daily;
             _dateRow.Visible = on && timing == StopTiming.Once;
             _scheduleHintRow.Visible = on && timing == StopTiming.ScheduleEnd;
@@ -186,6 +190,7 @@ namespace StayGreen.UI
 
             _when.Items = new[] { Loc.T("stop.mode.daily"), Loc.T("stop.mode.once"), Loc.T("stop.mode.schedule") };
             _whenRow.Title = Loc.T("stop.when");
+            _when.AccessibleName = Loc.T("stop.when");
             _timeRow.Title = Loc.T("stop.time");
             _dateRow.Title = Loc.T("stop.datetime");
             _scheduleHint.Text = Loc.T("stop.schedule.hint");
