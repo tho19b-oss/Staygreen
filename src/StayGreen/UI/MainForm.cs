@@ -19,6 +19,7 @@ namespace StayGreen.UI
         readonly Segmented _nav = new Segmented();
         readonly ScrollHost[] _hosts = new ScrollHost[PageCount];
         readonly Label _footer = new Label();
+        bool _built;
 
         public ActivityPage ActivityPage { get; private set; }
         public SchedulePage SchedulePage { get; private set; }
@@ -55,6 +56,7 @@ namespace StayGreen.UI
             foreach (ScrollHost host in _hosts) Controls.Add(host);
             Controls.Add(_footer);
 
+            _built = true;
             ApplyTexts();
             ShowSelectedPage();
         }
@@ -149,6 +151,9 @@ namespace StayGreen.UI
 
         void LayoutAll()
         {
+            // Windows meldet schon beim Einrichten des Fensters ein Layout, bevor alle Teile existieren.
+            if (!_built) return;
+
             int width = ClientSize.Width;
             int height = ClientSize.Height;
             if (width <= 0 || height <= 0) return;
