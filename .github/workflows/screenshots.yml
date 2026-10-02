@@ -56,6 +56,44 @@ jobs:
           $screen = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
           "Bildschirm: $($screen.Width)x$($screen.Height)"
 
+          # Nur im Zusatzlauf: Prueft die Bedienelemente per UI Automation und schreibt das Ergebnis ins Protokoll.
+          # - Auswahl- und Zahlenfelder: Name und aktueller Wert. Nach dem Scrollen muessen noch die Ausgangswerte stehen
+          #   (das Mausrad ueber einem Feld darf nichts verstellen, die Seite scrollt stattdessen).
+          # - Bedienelemente ohne Namen (Screenreader) werden einzeln gemeldet; die Teile eines Auswahl- oder Zahlenfelds zaehlen nicht.
+          function Probe-Fields($win, $name) {
+            $trueCond = [System.Windows.Automation.Condition]::TrueCondition
+            $walker = [System.Windows.Automation.TreeWalker]::ControlViewWalker
+            $fieldTypes = @('ControlType.ComboBox', 'ControlType.Spinner', 'ControlType.CheckBox', 'ControlType.Button', 'ControlType.Edit')
+            $all = $win.FindAll($scope::Descendants, $trueCond)
+            $unnamed = 0
+            foreach ($e in $all) {
+              try {
+                $type = $e.Current.ControlType.ProgrammaticName
+                if ($fieldTypes -notcontains $type) { continue }
+                $short = $type.Replace('ControlType.', '')
+                $parent = $walker.GetParent($e)
+                $parentType = ''
+                if ($null -ne $parent) { $parentType = $parent.Current.ControlType.ProgrammaticName }
+                $inner = ($parentType -eq 'ControlType.ComboBox' -or $parentType -eq 'ControlType.Spinner')
+                if ($type -eq 'ControlType.ComboBox' -or $type -eq 'ControlType.Spinner') {
+                  $parts = @()
+                  foreach ($k in $e.FindAll($scope::Children, $trueCond)) {
+                    $parts += ('{0}={1}' -f $k.Current.ControlType.ProgrammaticName.Replace('ControlType.', ''), $k.Current.Name)
+                  }
+                  $value = ''
+                  $pattern = $null
+                  if ($e.TryGetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern, [ref]$pattern)) { $value = $pattern.Current.Value }
+                  "  {0}: {1} '{2}' Wert='{3}' Teile=[{4}]" -f $name, $short, $e.Current.Name, $value, ($parts -join '; ')
+                }
+                if (-not $inner -and [string]::IsNullOrWhiteSpace($e.Current.Name)) {
+                  $unnamed++
+                  "  {0}: OHNE NAMEN: {1} bei {2}" -f $name, $short, $e.Current.BoundingRectangle
+                }
+              } catch { }
+            }
+            "  {0}: {1} Elemente im Fenster, {2} Bedienelemente ohne Namen" -f $name, $all.Count, $unnamed
+          }
+
           # $tall: Fenster vor der Aufnahme auf bis zu 1000 Pixel Hoehe ziehen (soweit der Bildschirm reicht), damit
           # auch lange Seiten ganz zu sehen sind.
           # $scroll: Anzahl Mausrad-Schritte nach unten vor der Aufnahme (zeigt untere Kartenbereiche).
@@ -95,16 +133,7 @@ jobs:
               [void][WinApi]::SetCursorPos([int]($br.Left + $br.Width / 2), [int]($br.Top + $br.Height * 0.7))
               for ($k = 0; $k -lt $scroll; $k++) { [WinApi]::mouse_event(0x0800, 0, 0, -120, [UIntPtr]::Zero); Start-Sleep -Milliseconds 80 }
               Start-Sleep -Milliseconds 600
-              # Pruefung: Das Mausrad ueber einem Auswahlfeld darf dessen Wert nicht aendern (die Seite scrollt stattdessen).
-              # Ausgabe im Protokoll: Name des Felds und gewaehlter Eintrag, hier muessen noch die Ausgangswerte stehen.
-              $comboType = [System.Windows.Automation.ControlType]::ComboBox
-              $comboCond = New-Object System.Windows.Automation.PropertyCondition($AE::ControlTypeProperty, $comboType)
-              foreach ($combo in $win.FindAll($scope::Descendants, $comboCond)) {
-                $valuePattern = $null
-                if ($combo.TryGetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern, [ref]$valuePattern)) {
-                  "  {0}: Auswahlfeld '{1}' = '{2}'" -f $name, $combo.Current.Name, $valuePattern.Current.Value
-                }
-              }
+              Probe-Fields $win $name
             }
             Start-Sleep -Milliseconds 800
             $r = [WinApi]::FrameBounds($h)
