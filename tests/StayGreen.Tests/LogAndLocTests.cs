@@ -204,7 +204,8 @@ namespace StayGreen.Tests
                     Loc.Language = lang;
                     string help = Loc.T("cli.help");
                     foreach (string option in new[]
-                        { "--start", "--no-start", "--minimized", "--settings", "--lang", "--tab", "--selftest", "--autostart", "--help" })
+                        { "--start", "--stop", "--toggle", "--pause", "--resume", "--no-start", "--minimized", "--settings",
+                          "--lang", "--theme", "--tab", "--selftest", "--autostart", "--help" })
                         Assert.True(help.Contains(option), lang + ": " + option);
                 }
 

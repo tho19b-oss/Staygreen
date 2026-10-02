@@ -1,5 +1,6 @@
 using System;
 using System.Runtime.InteropServices;
+using System.Text;
 
 namespace StayGreen.Platform
 {
@@ -12,8 +13,14 @@ namespace StayGreen.Platform
         public const uint KEYEVENTF_KEYUP = 0x0002;
         public const uint MOUSEEVENTF_MOVE = 0x0001;
 
-        /// <summary>F15: existiert auf keiner Standardtastatur, loest in keinem Programm etwas aus.</summary>
-        public const ushort VK_F15 = 0x7E;
+        /// <summary>F13 = 0x7C ... F24 = 0x87. F15 ist die Standardtaste: gibt es auf kaum einer Tastatur und loest in fast keinem Programm etwas aus.</summary>
+        public const ushort VK_F13 = 0x7C;
+
+        public const ushort VK_SHIFT = 0x10;
+        public const ushort VK_CONTROL = 0x11;
+        public const ushort VK_MENU = 0x12;
+        public const ushort VK_LCONTROL = 0xA2;
+        public const ushort VK_RMENU = 0xA5;
 
         public const uint MAPVK_VK_TO_VSC = 0;
 
@@ -102,6 +109,21 @@ namespace StayGreen.Platform
 
         [DllImport("user32.dll")]
         public static extern uint MapVirtualKey(uint uCode, uint uMapType);
+
+        [DllImport("user32.dll")]
+        public static extern uint MapVirtualKeyEx(uint uCode, uint uMapType, IntPtr dwhkl);
+
+        [DllImport("user32.dll")]
+        public static extern IntPtr GetKeyboardLayout(uint idThread);
+
+        [DllImport("user32.dll")]
+        public static extern int GetKeyboardLayoutList(int nBuff, [Out] IntPtr[] lpList);
+
+        /// <summary>Welches Zeichen tippt diese Taste mit dem gegebenen Umschaltzustand? (Hotkey-Pruefung auf AltGr-Belegungen)</summary>
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+        public static extern int ToUnicodeEx(uint wVirtKey, uint wScanCode, byte[] lpKeyState,
+            [Out, MarshalAs(UnmanagedType.LPWStr, SizeParamIndex = 4)] StringBuilder pwszBuff,
+            int cchBuff, uint wFlags, IntPtr dwhkl);
 
         [DllImport("user32.dll")]
         [return: MarshalAs(UnmanagedType.Bool)]

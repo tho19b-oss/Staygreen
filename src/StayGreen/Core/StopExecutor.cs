@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace StayGreen.Core
 {
@@ -10,6 +11,15 @@ namespace StayGreen.Core
         public bool Shutdown { get; set; }
         public bool ExitApp { get; set; }
 
+        /// <summary>
+        /// Teams beenden, Sperren und Herunterfahren stoeren die Arbeit und brauchen deshalb eine Vorwarnung.
+        /// Nur das Aktivhalten zu stoppen oder StayGreen zu beenden ist harmlos.
+        /// </summary>
+        public bool NeedsWarning
+        {
+            get { return CloseTeams || Lock || Shutdown; }
+        }
+
         public static StopPlan FromSettings(Settings s)
         {
             return new StopPlan
@@ -20,26 +30,36 @@ namespace StayGreen.Core
                 ExitApp = s.StopExitApp,
             };
         }
+
+        /// <summary>Lesbare Aufzaehlung der Aktionen ("Teams beenden, Windows sperren").</summary>
+        public string Describe()
+        {
+            var parts = new List<string>();
+            if (CloseTeams) parts.Add(Loc.T("plan.action.teams"));
+            if (Lock) parts.Add(Loc.T("plan.action.lock"));
+            if (Shutdown) parts.Add(Loc.T("plan.action.shutdown"));
+            if (ExitApp) parts.Add(Loc.T("plan.action.exit"));
+            return parts.Count == 0 ? Loc.T("plan.action.none") : string.Join(", ", parts);
+        }
     }
 
     public sealed class StopOutcome
     {
         public bool TeamsClosed { get; set; }
         public bool ShutdownStarted { get; set; }
-        public bool ShutdownCancelled { get; set; }
         public bool Locked { get; set; }
         public bool ExitRequested { get; set; }
     }
 
-    /// <summary>Fuehrt die Auto-Stopp-Aktionen in fester, sicherer Reihenfolge aus.</summary>
+    /// <summary>
+    /// Fuehrt die Auto-Stopp-Aktionen in fester, sicherer Reihenfolge aus. Die Vorwarnung (abbrechen, verschieben)
+    /// gibt es schon vorher im <see cref="AutoStopCoordinator"/>; hier wird nur noch ausgefuehrt.
+    /// </summary>
     public static class StopExecutor
     {
         /// <param name="plan">Gewuenschte Aktionen.</param>
         /// <param name="actions">Systemzugriff.</param>
-        /// <param name="confirmShutdown">
-        /// Zeigt den abbrechbaren Countdown. True = herunterfahren, False = abgebrochen. Null = ohne Rueckfrage.
-        /// </param>
-        public static StopOutcome Execute(StopPlan plan, ISystemActions actions, Func<bool> confirmShutdown)
+        public static StopOutcome Execute(StopPlan plan, ISystemActions actions)
         {
             var outcome = new StopOutcome();
 
@@ -50,22 +70,14 @@ namespace StayGreen.Core
                 outcome.TeamsClosed = true;
             }
 
-            // 2. Herunterfahren, mit Countdown und Abbruchmoeglichkeit.
+            // 2. Herunterfahren (ohne Zwang, ungespeicherte Programme halten es auf).
             if (plan.Shutdown)
             {
-                if (confirmShutdown == null || confirmShutdown())
-                {
-                    actions.Shutdown();
-                    outcome.ShutdownStarted = true;
-                }
-                else
-                {
-                    outcome.ShutdownCancelled = true;
-                }
+                actions.Shutdown();
+                outcome.ShutdownStarted = true;
             }
 
             // 3. Sperren: nur sinnvoll, wenn der Rechner nicht ohnehin herunterfaehrt.
-            //    Wurde das Herunterfahren abgebrochen, wird trotzdem gesperrt (sicherer Standard).
             if (plan.Lock && !outcome.ShutdownStarted)
             {
                 actions.LockWorkstation();

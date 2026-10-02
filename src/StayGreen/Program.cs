@@ -37,8 +37,11 @@ namespace StayGreen
             {
                 if (!instance.IsFirst)
                 {
-                    // Schon gestartet: das vorhandene Fenster nach vorn holen und still beenden.
-                    instance.SignalFirstInstance();
+                    // Schon gestartet: Gab es einen Befehl (--start, --stop, --toggle, --pause, --resume), geht er an die
+                    // laufende Instanz, sonst (oder wenn keine antwortet, z. B. eine aeltere Version) wird ihr Fenster
+                    // nach vorn geholt. Danach beendet sich dieser Start still.
+                    bool delivered = cmd.Remote != null && CommandPipe.Send(cmd.Remote.ToLine());
+                    if (!delivered) instance.SignalFirstInstance();
                     return 0;
                 }
 

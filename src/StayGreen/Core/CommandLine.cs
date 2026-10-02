@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 using System.IO;
 
 namespace StayGreen.Core
@@ -18,6 +19,18 @@ namespace StayGreen.Core
         /// <summary>Aktivhalten nicht automatisch starten (unabhaengig von der Einstellung).</summary>
         public bool NoStart { get; private set; }
 
+        /// <summary>"--stop": laeuft schon eine Instanz, wird sie gestoppt; sonst startet StayGreen ohne Aktivhalten.</summary>
+        public bool Stop { get; private set; }
+
+        /// <summary>"--toggle": laeuft schon eine Instanz, wird umgeschaltet; sonst startet StayGreen mit Aktivhalten.</summary>
+        public bool Toggle { get; private set; }
+
+        /// <summary>
+        /// Der Befehl, der einer bereits laufenden Instanz geschickt wird (--start, --stop, --toggle, --pause, --resume);
+        /// null, wenn keiner angegeben ist (dann wird nur das Fenster nach vorn geholt).
+        /// </summary>
+        public RemoteCommand Remote { get; private set; }
+
         public bool Help { get; private set; }
 
         /// <summary>Selbsttest ausfuehren und das Ergebnis in diese Datei schreiben.</summary>
@@ -32,8 +45,26 @@ namespace StayGreen.Core
         /// <summary>"de" oder "en": Sprache nur fuer diesen Start.</summary>
         public string Language { get; private set; }
 
+        /// <summary>"light", "dark" oder "auto": Darstellung nur fuer diesen Start; null = Einstellung gilt.</summary>
+        public string Theme { get; private set; }
+
         /// <summary>Seite, die beim Start gezeigt wird (0 Aktivitaet, 1 Zeitplan inkl. Auto-Stopp, 2 System); -1 = Standard.</summary>
         public int Tab { get; private set; } = -1;
+
+        /// <summary>
+        /// Soll StayGreen beim Start das Aktivhalten beginnen (unabhaengig von der Einstellung)? "--pause" gehoert
+        /// nicht dazu: Eine Pause wirkt nur auf ein laufendes Aktivhalten.
+        /// </summary>
+        public bool StartRequested
+        {
+            get { return Start || Toggle; }
+        }
+
+        /// <summary>Soll StayGreen beim Start ausdruecklich NICHT mit dem Aktivhalten beginnen?</summary>
+        public bool NoStartRequested
+        {
+            get { return NoStart || Stop; }
+        }
 
         public static string DefaultSelfTestPath
         {
@@ -70,9 +101,24 @@ namespace StayGreen.Core
                         break;
                     case "--start":
                         result.Start = true;
+                        result.Remote = new RemoteCommand(RemoteAction.Start);
                         break;
                     case "--no-start":
                         result.NoStart = true;
+                        break;
+                    case "--stop":
+                        result.Stop = true;
+                        result.Remote = new RemoteCommand(RemoteAction.Stop);
+                        break;
+                    case "--toggle":
+                        result.Toggle = true;
+                        result.Remote = new RemoteCommand(RemoteAction.Toggle);
+                        break;
+                    case "--resume":
+                        result.Remote = new RemoteCommand(RemoteAction.Resume);
+                        break;
+                    case "--pause":
+                        result.Remote = new RemoteCommand(RemoteAction.Pause, ParseMinutes(value ?? NextNumber(args, ref i)));
                         break;
                     case "--help":
                     case "-h":
@@ -94,9 +140,20 @@ namespace StayGreen.Core
                         string lang = (value ?? NextValue(args, ref i) ?? "").Trim().ToLowerInvariant();
                         if (lang == "de" || lang == "en") result.Language = lang;
                         break;
+                    case "--theme":
+                        string theme = (value ?? NextValue(args, ref i) ?? "").Trim().ToLowerInvariant();
+                        if (theme == "light" || theme == "dark" || theme == "auto") result.Theme = theme;
+                        break;
                 }
             }
             return result;
+        }
+
+        static int ParseMinutes(string text)
+        {
+            int minutes;
+            if (!int.TryParse((text ?? "").Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out minutes)) minutes = 0;
+            return RemoteCommand.ClampMinutes(minutes);
         }
 
         static int ParseTab(string text)
@@ -116,6 +173,19 @@ namespace StayGreen.Core
         static string NextValue(string[] args, ref int index)
         {
             if (index + 1 < args.Length && args[index + 1] != null && !args[index + 1].StartsWith("-"))
+            {
+                index++;
+                return args[index];
+            }
+            return null;
+        }
+
+        /// <summary>Naechstes Argument, aber nur wenn es eine Zahl ist (z. B. "--pause 45"); sonst bleibt es unberuehrt.</summary>
+        static string NextNumber(string[] args, ref int index)
+        {
+            int ignored;
+            if (index + 1 < args.Length && args[index + 1] != null
+                && int.TryParse(args[index + 1].Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out ignored))
             {
                 index++;
                 return args[index];

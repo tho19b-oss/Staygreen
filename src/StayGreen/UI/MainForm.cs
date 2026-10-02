@@ -42,6 +42,7 @@ namespace StayGreen.UI
             Icon = _app.WindowIcon;
 
             _hero.ToggleClicked += () => _app.Toggle(Loc.T("reason.manual"));
+            _hero.ResumeClicked += () => _app.ResumeFromPause();
             _nav.SelectedIndexChanged += (o, e) => ShowSelectedPage();
 
             _footer.AutoSize = false;
@@ -135,6 +136,12 @@ namespace StayGreen.UI
             }
         }
 
+        /// <summary>Die gerade gezeigte Seite (0 Aktivitaet, 1 Zeitplan, 2 System).</summary>
+        public int SelectedTab
+        {
+            get { return _nav.SelectedIndex; }
+        }
+
         /// <summary>Zeigt die Seite mit diesem Index (0 Aktivitaet, 1 Zeitplan, 2 System).</summary>
         public void SelectTab(int index)
         {
@@ -223,6 +230,9 @@ namespace StayGreen.UI
 
     static class AppInfo
     {
+        /// <summary>Hierhin fuehrt "Neue Version suchen": Die Seite oeffnet im Browser, StayGreen selbst verbindet sich nie.</summary>
+        public const string ReleaseUrl = "https://github.com/tho19b-oss/Staygreen/releases/latest";
+
         public static string Version
         {
             get

@@ -16,14 +16,24 @@ namespace StayGreen.Platform
         /// <summary>Letzter Win32-Fehlercode von SendInput (0 = kein Fehler); fuer Diagnose und Selbsttest.</summary>
         public int LastError { get; private set; }
 
-        public bool SendActivity(ActivityMode mode, int mousePixels)
+        public bool SendActivity(ActivityMode mode, int mousePixels, ActivityKey key)
         {
             bool ok = true;
             if (mode == ActivityMode.Key || mode == ActivityMode.Both)
-                ok &= SendKey(NativeMethods.VK_F15);
+                ok &= SendKey(VirtualKey(key));
             if (mode == ActivityMode.Mouse || mode == ActivityMode.Both)
                 ok &= NudgeMouse(mousePixels);
             return ok;
+        }
+
+        /// <summary>
+        /// Tastencode der gewaehlten Taste: F13 bis F24 liegen lueckenlos ab 0x7C, die Reihenfolge von
+        /// <see cref="ActivityKey"/> entspricht dieser Zaehlung; die Umschalttaste ist VK_SHIFT.
+        /// </summary>
+        public static ushort VirtualKey(ActivityKey key)
+        {
+            if (key == ActivityKey.Shift) return NativeMethods.VK_SHIFT;
+            return (ushort)(NativeMethods.VK_F13 + (int)key);
         }
 
         /// <summary>Drueckt Modifier + Taste und laesst alles wieder los (fuer den Hotkey-Selbsttest).</summary>
@@ -138,7 +148,7 @@ namespace StayGreen.Platform
     {
         DateTime _lastInput = DateTime.UtcNow.AddMinutes(-10);
 
-        public bool SendActivity(ActivityMode mode, int mousePixels)
+        public bool SendActivity(ActivityMode mode, int mousePixels, ActivityKey key)
         {
             _lastInput = DateTime.UtcNow;
             return true;

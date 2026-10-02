@@ -11,9 +11,12 @@ namespace StayGreen.UI
         Off,
         Active,
         Failed,
+
+        /// <summary>Die Kombination wuerde auf der Tastatur ein Zeichen tippen (AltGr) und wird deshalb nicht angemeldet.</summary>
+        Conflict,
     }
 
-    /// <summary>Start, Tastenkombination, Protokoll, Sprache.</summary>
+    /// <summary>Start, Tastenkombination, Protokoll, Sprache, Darstellung.</summary>
     sealed class SystemPage : PageBase
     {
         readonly Card _startCard = new Card();
@@ -36,27 +39,35 @@ namespace StayGreen.UI
         readonly ChipBox _alt = new ChipBox();
         readonly ChipBox _shift = new ChipBox();
         readonly ChipBox _win = new ChipBox();
-        readonly ComboBox _key = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = Dpi.Px(68) };
+        readonly ComboBox _key = Style(new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = Dpi.Px(68) });
         readonly Stack _comboRow;
 
         readonly SwitchBox _log = CreateSwitch();
         readonly SettingRow _logRow;
-        readonly TextBox _logPath = new TextBox { BorderStyle = BorderStyle.FixedSingle };
+        readonly TextBox _logPath = Style(new TextBox { BorderStyle = BorderStyle.FixedSingle });
         readonly FlatButton _browse = CreateButton(ButtonKind.Secondary);
         readonly FlatButton _openLog = CreateButton(ButtonKind.Secondary);
         readonly Stack _logPathRow;
         readonly Stack _logButtonRow;
 
-        readonly ComboBox _lang = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = Dpi.Px(200) };
+        readonly ComboBox _lang = Style(new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = Dpi.Px(200) });
         readonly SettingRow _langRow;
+        readonly ComboBox _theme = Style(new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = Dpi.Px(200) });
+        readonly SettingRow _themeRow;
         readonly FlatButton _openFolder = CreateButton(ButtonKind.Secondary);
         readonly SettingRow _folderRow;
+        readonly FlatButton _checkUpdate = CreateButton(ButtonKind.Secondary);
+        readonly SettingRow _updateRow;
+
+        string _settingsError;
+        string _logError;
 
         /// <summary>Standardpfad des Protokolls (vom Hauptfenster geliefert).</summary>
         public Func<string> DefaultLogPath = () => "";
 
         public Action OpenFolderRequested;
         public Action OpenLogRequested;
+        public Action OpenReleasePageRequested;
         public bool IsPortable;
 
         public SystemPage()
@@ -87,11 +98,15 @@ namespace StayGreen.UI
             _logCard.Add(_logPathRow);
             _logCard.Add(_logButtonRow);
 
-            // Sprache und Daten
+            // Sprache, Darstellung und Daten
             _langRow = new SettingRow(_lang);
+            _themeRow = new SettingRow(_theme);
             _folderRow = new SettingRow(_openFolder);
+            _updateRow = new SettingRow(_checkUpdate);
             _generalCard.AddRow(_langRow);
+            _generalCard.AddRow(_themeRow);
             _generalCard.AddRow(_folderRow);
+            _generalCard.AddRow(_updateRow);
 
             Controls.Add(_startCard);
             Controls.Add(_hotkeyCard);
@@ -141,7 +156,14 @@ namespace StayGreen.UI
                 S.Language = _lang.SelectedIndex == 1 ? "de" : (_lang.SelectedIndex == 2 ? "en" : "auto");
                 Fire();
             };
+            _theme.SelectedIndexChanged += (o, e) =>
+            {
+                if (Loading || S == null || _theme.SelectedIndex < 0) return;
+                S.Theme = _theme.SelectedIndex == 1 ? "light" : (_theme.SelectedIndex == 2 ? "dark" : "auto");
+                Fire();
+            };
             _openFolder.Click += (o, e) => { if (OpenFolderRequested != null) OpenFolderRequested(); };
+            _checkUpdate.Click += (o, e) => { if (OpenReleasePageRequested != null) OpenReleasePageRequested(); };
         }
 
         void HotkeyEdited()
@@ -208,6 +230,7 @@ namespace StayGreen.UI
             int keyIndex = Array.IndexOf(Settings.HotkeyKeys, s.HotkeyKey);
             _key.SelectedIndex = keyIndex >= 0 ? keyIndex : 6;
             _lang.SelectedIndex = s.Language == "de" ? 1 : (s.Language == "en" ? 2 : 0);
+            _theme.SelectedIndex = s.Theme == "light" ? 1 : (s.Theme == "dark" ? 2 : 0);
             UpdateEnabled();
         }
 
@@ -219,7 +242,9 @@ namespace StayGreen.UI
             _comboRow.Enabled = _hotkey.Checked;
         }
 
-        public void SetHotkeyStatus(HotkeyState state, string description)
+        /// <summary>Zeigt, ob die Tastenkombination aktiv ist, belegt ist oder auf der Tastatur ein Zeichen tippen wuerde.</summary>
+        /// <param name="character">Bei <see cref="HotkeyState.Conflict"/> das Zeichen, das getippt wuerde.</param>
+        public void SetHotkeyStatus(HotkeyState state, string description, string character = null)
         {
             switch (state)
             {
@@ -231,11 +256,52 @@ namespace StayGreen.UI
                     _hotkeyRow.Caption = Loc.T("sys.hotkey.fail", description);
                     _hotkeyRow.CaptionColor = Theme.Red;
                     break;
+                case HotkeyState.Conflict:
+                    _hotkeyRow.Caption = Loc.T("sys.hotkey.conflict", description, character ?? "?");
+                    _hotkeyRow.CaptionColor = Theme.Red;
+                    break;
                 default:
                     _hotkeyRow.Caption = "";
                     break;
             }
             RefreshLayout();
+        }
+
+        /// <summary>
+        /// Zeigt Speicher- und Protokollfehler dauerhaft an der jeweiligen Einstellung (null = alles in Ordnung),
+        /// damit ein nicht beschreibbarer Ordner nicht still Einstellungen verschluckt.
+        /// </summary>
+        public void SetStorageStatus(string settingsError, string logError)
+        {
+            _settingsError = settingsError;
+            _logError = logError;
+            ApplyStorageCaptions();
+            RefreshLayout();
+        }
+
+        void ApplyStorageCaptions()
+        {
+            if (_settingsError != null)
+            {
+                _folderRow.Caption = Loc.T("sys.storage.fail", _settingsError);
+                _folderRow.CaptionColor = Theme.Red;
+            }
+            else
+            {
+                _folderRow.Caption = IsPortable ? Loc.T("sys.portable") : "";
+                _folderRow.CaptionColor = Theme.Muted;
+            }
+
+            if (_logError != null)
+            {
+                _logRow.Caption = Loc.T("sys.log.fail", _logError);
+                _logRow.CaptionColor = Theme.Red;
+            }
+            else
+            {
+                _logRow.Caption = Loc.T("sys.log.hint");
+                _logRow.CaptionColor = Theme.Muted;
+            }
         }
 
         public override void ApplyTexts()
@@ -253,17 +319,23 @@ namespace StayGreen.UI
             _alt.Text = Loc.T("key.alt");
             _shift.Text = Loc.T("key.shift");
             _win.Text = Loc.T("key.win");
+            _key.AccessibleName = Loc.T("sys.hotkey");
 
             _logCard.Text = Loc.T("sys.grp.log");
             _logRow.Title = Loc.T("sys.log");
+            _logPath.AccessibleName = Loc.T("sys.log");
             _browse.Text = Loc.T("sys.log.change");
             _openLog.Text = Loc.T("sys.log.open");
 
             _generalCard.Text = Loc.T("sys.grp.general");
             _langRow.Title = Loc.T("sys.language");
+            _themeRow.Title = Loc.T("sys.theme");
             _folderRow.Title = Loc.T("sys.folder");
-            _folderRow.Caption = IsPortable ? Loc.T("sys.portable") : "";
             _openFolder.Text = Loc.T("sys.log.open");
+            _updateRow.Title = Loc.T("sys.update");
+            _updateRow.Caption = Loc.T("sys.update.hint");
+            _checkUpdate.Text = Loc.T("sys.update.open");
+            ApplyStorageCaptions();
 
             Quiet(() =>
             {
@@ -273,6 +345,13 @@ namespace StayGreen.UI
                 _lang.Items.Add("Deutsch");
                 _lang.Items.Add("English");
                 _lang.SelectedIndex = selected >= 0 ? selected : 0;
+
+                int selectedTheme = _theme.SelectedIndex;
+                _theme.Items.Clear();
+                _theme.Items.Add(Loc.T("sys.theme.auto"));
+                _theme.Items.Add(Loc.T("sys.theme.light"));
+                _theme.Items.Add(Loc.T("sys.theme.dark"));
+                _theme.SelectedIndex = selectedTheme >= 0 ? selectedTheme : 0;
             });
             RefreshLayout();
         }
