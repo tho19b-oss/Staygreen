@@ -94,14 +94,17 @@ jobs:
             Start-Sleep -Milliseconds 500
           }
 
-          $base = @('StartHoldingOnLaunch=true')
-          $schedule = @('ScheduleEnabled=true', 'Rule=1111100;08:00;12:00', 'Rule=1111100;13:00;17:00')
+          # NoticeAccepted: Der einmalige Hinweis beim ersten Oeffnen soll das Fenster nicht verdecken.
+          $base = @('StartHoldingOnLaunch=true', 'NoticeAccepted=true')
+          $schedule = @('ScheduleEnabled=true', 'Rule=1111100;08:00;12:00', 'Rule=1111100;13:00;17:00', 'Exception=2026-12-24;2026-12-31')
           $autostop = @('AutoStopEnabled=true', 'AutoStopTiming=Daily', 'AutoStopTime=17:00', 'StopCloseTeams=true', 'StopLock=true', 'StopExitApp=true')
-          Take-Shot 'de-1-aktivitaet' 'de' $null @() $base $false
+          Take-Shot 'de-1-aktivitaet' 'de' $null @() $base $true
           Take-Shot 'de-2-zeitplan' 'de' 'schedule' @() ($base + $schedule) $true
           Take-Shot 'de-3-autostopp' 'de' 'stop' @() ($base + $autostop) $true
           Take-Shot 'de-4-system' 'de' 'system' @() ($base + @('LogEnabled=true', 'LogPath=C:\Users\Anna\Dokumente\StayGreen-Protokoll.txt')) $true
           Take-Shot 'de-5-gestoppt' 'de' $null @('--no-start') $base $false
+          Take-Shot 'de-6-dunkel' 'de' $null @('--theme', 'dark') $base $true
+          Take-Shot 'de-7-pausiert' 'de' $null @('--pause', '30') $base $false
           Take-Shot 'en-1-activity' 'en' $null @() $base $false
           Take-Shot 'en-2-schedule' 'en' 'schedule' @() ($base + $schedule + $autostop) $true
 
