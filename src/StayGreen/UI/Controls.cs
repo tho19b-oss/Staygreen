@@ -701,7 +701,7 @@ namespace StayGreen.UI
     /// <summary>Eine Auswahl aus wenigen Moeglichkeiten als Leiste (Registerkarten, "Taeglich/Einmalig").</summary>
     sealed class Segmented : Control
     {
-        string[] _items = new string[0];
+        string[] _items = Array.Empty<string>();
         int _selected;
         int _hover = -1;
 
@@ -724,7 +724,7 @@ namespace StayGreen.UI
             get { return _items; }
             set
             {
-                _items = value ?? new string[0];
+                _items = value ?? Array.Empty<string>();
                 if (_selected >= _items.Length) _selected = Math.Max(0, _items.Length - 1);
                 if (AutoFit) Fit();
                 Invalidate();

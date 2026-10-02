@@ -50,8 +50,8 @@ namespace StayGreen.Core
         public HolderEngine(IInputBackend input, Settings settings, Action<DateTime, string, string> log,
             ITeamsProbe teams = null)
         {
-            if (input == null) throw new ArgumentNullException("input");
-            if (settings == null) throw new ArgumentNullException("settings");
+            if (input == null) throw new ArgumentNullException(nameof(input));
+            if (settings == null) throw new ArgumentNullException(nameof(settings));
             _input = input;
             _settings = settings;
             _log = log;

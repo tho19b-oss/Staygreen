@@ -200,7 +200,7 @@ namespace StayGreen.UI
             using (var pen = new Pen(Theme.Divider))
                 e.Graphics.DrawLine(pen, r.Left, r.Bottom - 1, r.Right, r.Bottom - 1);
             var text = new Rectangle(r.Left + Dpi.Px(10), r.Top, r.Width - Dpi.Px(20), r.Height);
-            TextRenderer.DrawText(e.Graphics, Convert.ToString(list.Items[e.Index]), e.Font, text, Theme.Text,
+            TextRenderer.DrawText(e.Graphics, (string)list.Items[e.Index], e.Font, text, Theme.Text,
                 TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine
                 | TextFormatFlags.NoPrefix | TextFormatFlags.EndEllipsis);
         }

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -34,7 +35,7 @@ namespace StayGreen.Platform
                 lines.Add((ok ? "OK    " : "FEHLER") + "  " + name + (string.IsNullOrEmpty(detail) ? "" : "  (" + detail + ")"));
             };
 
-            lines.Add("StayGreen Selbsttest " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
+            lines.Add("StayGreen Selbsttest " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture));
             lines.Add("Windows: " + PlatformInfo.IsWindows + ", 64 Bit Prozess: " + (IntPtr.Size == 8)
                       + ", OS: " + Environment.OSVersion.VersionString + ", Runtime: " + Environment.Version);
 
@@ -77,14 +78,14 @@ namespace StayGreen.Platform
             Thread.Sleep(3000);
             TimeSpan idleBefore = input.GetIdleTime();
             check("Leerlauf messbar", idleBefore >= TimeSpan.FromSeconds(2.5),
-                "vorher " + idleBefore.TotalSeconds.ToString("0.0") + " s");
+                "vorher " + idleBefore.TotalSeconds.ToString("0.0", CultureInfo.InvariantCulture) + " s");
 
             bool key = input.SendActivity(ActivityMode.Key, 2, ActivityKey.F15);
             check("Tastendruck (F15) angenommen", key, "Win32-Fehler " + input.LastError);
             Thread.Sleep(150);
             TimeSpan afterKey = input.GetIdleTime();
             check("Leerlauf nach Tastendruck zurueckgesetzt", afterKey < TimeSpan.FromSeconds(2),
-                "nachher " + afterKey.TotalSeconds.ToString("0.0") + " s");
+                "nachher " + afterKey.TotalSeconds.ToString("0.0", CultureInfo.InvariantCulture) + " s");
 
             Thread.Sleep(3000);
             bool mouse = input.SendActivity(ActivityMode.Mouse, 2, ActivityKey.F15);
@@ -92,7 +93,7 @@ namespace StayGreen.Platform
             Thread.Sleep(150);
             TimeSpan afterMouse = input.GetIdleTime();
             check("Leerlauf nach Mausbewegung zurueckgesetzt", afterMouse < TimeSpan.FromSeconds(2),
-                "nachher " + afterMouse.TotalSeconds.ToString("0.0") + " s");
+                "nachher " + afterMouse.TotalSeconds.ToString("0.0", CultureInfo.InvariantCulture) + " s");
 
             Thread.Sleep(3000);
             bool shift = input.SendActivity(ActivityMode.Key, 2, ActivityKey.Shift);
@@ -100,7 +101,7 @@ namespace StayGreen.Platform
             Thread.Sleep(150);
             TimeSpan afterShift = input.GetIdleTime();
             check("Leerlauf nach Umschalt-Tipp zurueckgesetzt", afterShift < TimeSpan.FromSeconds(2),
-                "nachher " + afterShift.TotalSeconds.ToString("0.0") + " s");
+                "nachher " + afterShift.TotalSeconds.ToString("0.0", CultureInfo.InvariantCulture) + " s");
 
             check("Tastencodes F13-F24", Win32Input.VirtualKey(ActivityKey.F13) == 0x7C
                                           && Win32Input.VirtualKey(ActivityKey.F15) == 0x7E

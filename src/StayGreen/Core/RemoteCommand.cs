@@ -27,6 +27,8 @@ namespace StayGreen.Core
     /// </summary>
     public sealed class RemoteCommand
     {
+        static readonly char[] Separators = { ' ', '\t' };
+
         public const int DefaultPauseMinutes = 30;
         public const int MaxPauseMinutes = 24 * 60;
 
@@ -65,7 +67,7 @@ namespace StayGreen.Core
             command = null;
             if (string.IsNullOrWhiteSpace(line)) return false;
 
-            string[] parts = line.Trim().ToLowerInvariant().Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+            string[] parts = line.Trim().ToLowerInvariant().Split(Separators, StringSplitOptions.RemoveEmptyEntries);
             if (parts.Length == 0 || parts.Length > 2) return false;
 
             if (parts[0] == "pause")

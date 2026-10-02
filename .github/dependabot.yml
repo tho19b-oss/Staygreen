@@ -1,0 +1,24 @@
+version: 2
+updates:
+  # Versionen der GitHub-Actions in den Workflows (z. B. actions/checkout)
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: "CI"
+
+  # NuGet-Pakete: Referenz-Assemblies der App und Test-Werkzeuge
+  - package-ecosystem: nuget
+    directory: /src/StayGreen
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: "Abhaengigkeit"
+
+  - package-ecosystem: nuget
+    directory: /tests/StayGreen.Tests
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: "Abhaengigkeit"

@@ -1,5 +1,4 @@
 using System;
-using System.Text;
 using StayGreen.Core;
 
 namespace StayGreen.Platform
@@ -64,11 +63,11 @@ namespace StayGreen.Platform
             }
             if (shift) state[NativeMethods.VK_SHIFT] = Down;
 
-            var buffer = new StringBuilder(8);
-            int count = NativeMethods.ToUnicodeEx(virtualKey, scan, state, buffer, buffer.Capacity, DoNotChangeKeyboardState, layout);
+            var buffer = new char[8];
+            int count = NativeMethods.ToUnicodeEx(virtualKey, scan, state, buffer, buffer.Length, DoNotChangeKeyboardState, layout);
 
             if (count < 0) return "?";                                    // Totzeichen
-            if (count == 0 || buffer.Length == 0) return null;
+            if (count == 0) return null;
             char c = buffer[0];
             return char.IsControl(c) ? null : c.ToString();
         }

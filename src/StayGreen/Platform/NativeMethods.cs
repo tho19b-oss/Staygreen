@@ -1,6 +1,5 @@
 using System;
 using System.Runtime.InteropServices;
-using System.Text;
 
 namespace StayGreen.Platform
 {
@@ -122,8 +121,7 @@ namespace StayGreen.Platform
         /// <summary>Welches Zeichen tippt diese Taste mit dem gegebenen Umschaltzustand? (Hotkey-Pruefung auf AltGr-Belegungen)</summary>
         [DllImport("user32.dll", CharSet = CharSet.Unicode)]
         public static extern int ToUnicodeEx(uint wVirtKey, uint wScanCode, byte[] lpKeyState,
-            [Out, MarshalAs(UnmanagedType.LPWStr, SizeParamIndex = 4)] StringBuilder pwszBuff,
-            int cchBuff, uint wFlags, IntPtr dwhkl);
+            [Out] char[] pwszBuff, int cchBuff, uint wFlags, IntPtr dwhkl);
 
         [DllImport("user32.dll")]
         [return: MarshalAs(UnmanagedType.Bool)]

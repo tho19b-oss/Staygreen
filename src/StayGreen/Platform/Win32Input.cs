@@ -131,6 +131,8 @@ namespace StayGreen.Platform
             return TimeSpan.FromMilliseconds(idleMs);
         }
 
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("Usage", "CA1806:Do not ignore method results",
+            Justification = "Schlaegt das Wach-Halten fehl, laeuft der PC normal weiter; es gibt nichts Sinnvolles zu tun.")]
         public void SetKeepAwake(bool keepAwake)
         {
             // ES_CONTINUOUS gilt pro Thread. Alle Aufrufe kommen vom UI-Thread (Timer), daher konsistent.
@@ -159,6 +161,8 @@ namespace StayGreen.Platform
             return DateTime.UtcNow - _lastInput;
         }
 
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("Usage", "CA1806:Do not ignore method results",
+            Justification = "Schlaegt das Wach-Halten fehl, laeuft der PC normal weiter; es gibt nichts Sinnvolles zu tun.")]
         public void SetKeepAwake(bool keepAwake)
         {
         }

@@ -84,7 +84,7 @@ namespace StayGreen.Core
                 string key = arg.ToLowerInvariant();
                 string value = null;
                 int eq = arg.IndexOf('=');
-                if (arg.StartsWith("--") && eq > 2)
+                if (arg.StartsWith("--", StringComparison.Ordinal) && eq > 2)
                 {
                     key = arg.Substring(0, eq).ToLowerInvariant();
                     value = arg.Substring(eq + 1);
@@ -172,7 +172,7 @@ namespace StayGreen.Core
         /// <summary>Naechstes Argument als Wert, sofern es keine Option ist.</summary>
         static string NextValue(string[] args, ref int index)
         {
-            if (index + 1 < args.Length && args[index + 1] != null && !args[index + 1].StartsWith("-"))
+            if (index + 1 < args.Length && args[index + 1] != null && !args[index + 1].StartsWith("-", StringComparison.Ordinal))
             {
                 index++;
                 return args[index];

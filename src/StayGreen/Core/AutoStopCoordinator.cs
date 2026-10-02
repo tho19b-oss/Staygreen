@@ -63,7 +63,7 @@ namespace StayGreen.Core
 
         public AutoStopCoordinator(Settings settings, IAutoStopPrompt prompt, Func<DateTime> clock)
         {
-            if (settings == null) throw new ArgumentNullException("settings");
+            if (settings == null) throw new ArgumentNullException(nameof(settings));
             _settings = settings;
             _prompt = prompt;
             _clock = clock ?? (() => DateTime.Now);
