@@ -32,7 +32,7 @@ namespace StayGreen.Core
         /// <summary>"de" oder "en": Sprache nur fuer diesen Start.</summary>
         public string Language { get; private set; }
 
-        /// <summary>Registerkarte, die beim Start gezeigt wird (0 Aktivitaet, 1 Zeitplan, 2 Auto-Stopp, 3 System); -1 = Standard.</summary>
+        /// <summary>Seite, die beim Start gezeigt wird (0 Aktivitaet, 1 Zeitplan inkl. Auto-Stopp, 2 System); -1 = Standard.</summary>
         public int Tab { get; private set; } = -1;
 
         public static string DefaultSelfTestPath
@@ -103,10 +103,11 @@ namespace StayGreen.Core
         {
             switch ((text ?? "").Trim().ToLowerInvariant())
             {
+                // Auto-Stopp liegt seit Version 1.1 auf der Seite "Zeitplan"; die alten Namen und Nummern zeigen dorthin.
                 case "0": case "activity": case "aktivitaet": case "aktivität": return 0;
-                case "1": case "schedule": case "zeitplan": return 1;
-                case "2": case "stop": case "autostop": case "auto-stop": case "auto-stopp": case "autostopp": return 2;
-                case "3": case "system": return 3;
+                case "1": case "2": case "schedule": case "zeitplan":
+                case "stop": case "autostop": case "auto-stop": case "auto-stopp": case "autostopp": return 1;
+                case "3": case "system": return 2;
                 default: return -1;
             }
         }

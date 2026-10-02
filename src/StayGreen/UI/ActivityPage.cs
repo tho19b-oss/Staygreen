@@ -7,67 +7,49 @@ namespace StayGreen.UI
     /// <summary>Methode, Intervall, intelligenter Modus und Wach-Halten.</summary>
     sealed class ActivityPage : PageBase
     {
-        readonly GroupBox _group;
-        readonly Label _modeLabel = CreateLabel();
-        readonly Label _intervalLabel = CreateLabel();
-        readonly Label _pixelsLabel = CreateLabel();
+        readonly Card _methodCard = new Card();
+        readonly Card _behaviorCard = new Card();
+
+        readonly ComboBox _mode = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList };
+        readonly NumericUpDown _interval = new NumericUpDown { Minimum = Settings.MinInterval, Maximum = Settings.MaxInterval };
+        readonly NumericUpDown _pixels = new NumericUpDown { Minimum = Settings.MinMousePixels, Maximum = Settings.MaxMousePixels };
         readonly Label _secondsUnit = CreateLabel();
         readonly Label _pixelsUnit = CreateLabel();
-        readonly ComboBox _mode = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList };
-        readonly NumericUpDown _interval = new NumericUpDown { Minimum = Settings.MinInterval, Maximum = Settings.MaxInterval, Width = 72 };
-        readonly NumericUpDown _pixels = new NumericUpDown { Minimum = Settings.MinMousePixels, Maximum = Settings.MaxMousePixels, Width = 72 };
-        readonly WrapLabel _intervalHint = CreateHint();
-        readonly CheckBox _smart = CreateCheck();
-        readonly WrapLabel _smartHint = CreateHint();
-        readonly CheckBox _awake = CreateCheck();
-        readonly WrapLabel _awakeHint = CreateHint();
-        readonly Button _test = new Button { AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, Padding = new Padding(10, 2, 10, 2) };
-        readonly WrapLabel _testResult = new WrapLabel();
+        readonly SwitchBox _smart = CreateSwitch();
+        readonly SwitchBox _awake = CreateSwitch();
+        readonly FlatButton _test = CreateButton(ButtonKind.Secondary);
+
+        readonly SettingRow _modeRow;
+        readonly SettingRow _intervalRow;
+        readonly SettingRow _pixelsRow;
+        readonly SettingRow _testRow;
+        readonly SettingRow _smartRow;
+        readonly SettingRow _awakeRow;
 
         /// <summary>Wird vom Hauptfenster gesetzt: erzeugt eine Eingabe und meldet, ob Windows sie angenommen hat.</summary>
         public Func<bool> TestRequested;
 
         public ActivityPage()
         {
-            TableLayoutPanel root = CreateRoot();
+            _mode.Width = Dpi.Px(230);
+            _interval.Width = Dpi.Px(76);
+            _pixels.Width = Dpi.Px(76);
 
-            TableLayoutPanel grid = CreateGrid(3);
-            grid.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-            grid.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-            grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
+            _modeRow = new SettingRow(_mode);
+            _intervalRow = new SettingRow(new InlineRow(_interval, _secondsUnit));
+            _pixelsRow = new SettingRow(new InlineRow(_pixels, _pixelsUnit));
+            _testRow = new SettingRow(_test);
+            _smartRow = new SettingRow(_smart);
+            _awakeRow = new SettingRow(_awake);
 
-            _mode.Dock = DockStyle.Fill;
-            _mode.Margin = new Padding(3, 3, 3, 3);
-            _interval.Anchor = AnchorStyles.Left;
-            _pixels.Anchor = AnchorStyles.Left;
-
-            grid.Controls.Add(_modeLabel, 0, 0);
-            grid.Controls.Add(_mode, 1, 0);
-            grid.SetColumnSpan(_mode, 2);
-            grid.Controls.Add(_intervalLabel, 0, 1);
-            grid.Controls.Add(_interval, 1, 1);
-            grid.Controls.Add(_secondsUnit, 2, 1);
-            grid.Controls.Add(_pixelsLabel, 0, 2);
-            grid.Controls.Add(_pixels, 1, 2);
-            grid.Controls.Add(_pixelsUnit, 2, 2);
-
-            _group = CreateGroup(grid);
-            AddRow(root, _group);
-            AddRow(root, _intervalHint);
-            AddRow(root, _smart);
-            AddRow(root, _smartHint);
-            AddRow(root, _awake);
-            AddRow(root, _awakeHint);
-
-            TableLayoutPanel testRow = CreateGrid(2);
-            testRow.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-            testRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
-            _test.Margin = new Padding(3, 6, 8, 3);
-            _testResult.Anchor = AnchorStyles.Left;
-            _testResult.Margin = new Padding(3, 9, 3, 3);
-            testRow.Controls.Add(_test, 0, 0);
-            testRow.Controls.Add(_testResult, 1, 0);
-            AddRow(root, testRow);
+            _methodCard.AddRow(_modeRow);
+            _methodCard.AddRow(_intervalRow);
+            _methodCard.AddRow(_pixelsRow);
+            _methodCard.AddRow(_testRow);
+            _behaviorCard.AddRow(_smartRow);
+            _behaviorCard.AddRow(_awakeRow);
+            Controls.Add(_methodCard);
+            Controls.Add(_behaviorCard);
 
             _mode.SelectedIndexChanged += (o, e) =>
             {
@@ -103,8 +85,9 @@ namespace StayGreen.UI
             _test.Click += (o, e) =>
             {
                 bool ok = TestRequested != null && TestRequested();
-                _testResult.Text = Loc.T(ok ? "act.test.ok" : "act.test.fail");
-                _testResult.ForeColor = ok ? Theme.Green : Theme.Red;
+                _testRow.Caption = Loc.T(ok ? "act.test.ok" : "act.test.fail");
+                _testRow.CaptionColor = ok ? Theme.GreenButton : Theme.Red;
+                RefreshLayout();
             };
         }
 
@@ -122,9 +105,7 @@ namespace StayGreen.UI
         void UpdateEnabled()
         {
             bool mouse = S != null && S.Mode != ActivityMode.Key;
-            _pixels.Enabled = mouse;
-            _pixelsLabel.Enabled = mouse;
-            _pixelsUnit.Enabled = mouse;
+            _pixelsRow.Enabled = mouse;
         }
 
         public override void ApplyTexts()
@@ -139,19 +120,24 @@ namespace StayGreen.UI
                 _mode.SelectedIndex = selected >= 0 ? selected : (int)ActivityMode.Both;
             });
 
-            _group.Text = Loc.T("act.grp.method");
-            _modeLabel.Text = Loc.T("act.mode");
-            _intervalLabel.Text = Loc.T("act.interval");
+            _methodCard.Text = Loc.T("act.grp.method");
+            _modeRow.Title = Loc.T("act.mode");
+            _intervalRow.Title = Loc.T("act.interval");
+            _intervalRow.Caption = Loc.T("act.hint");
             _secondsUnit.Text = Loc.T("act.unit.sec");
-            _pixelsLabel.Text = Loc.T("act.pixels");
+            _pixelsRow.Title = Loc.T("act.pixels");
+            _pixelsRow.Caption = Loc.T("act.pixels.hint");
             _pixelsUnit.Text = Loc.T("act.unit.px");
-            _intervalHint.Text = Loc.T("act.hint");
-            _smart.Text = Loc.T("act.smart");
-            _smartHint.Text = Loc.T("act.smart.hint");
-            _awake.Text = Loc.T("act.awake");
-            _awakeHint.Text = Loc.T("act.awake.hint");
+            _testRow.Title = Loc.T("act.test.title");
+            _testRow.Caption = Loc.T("act.test.hint");
+            _testRow.CaptionColor = Theme.Muted;
             _test.Text = Loc.T("act.test");
-            _testResult.Text = "";
+
+            _behaviorCard.Text = Loc.T("act.grp.behavior");
+            _smartRow.Title = Loc.T("act.smart");
+            _smartRow.Caption = Loc.T("act.smart.hint");
+            _awakeRow.Title = Loc.T("act.awake");
+            _awakeRow.Caption = Loc.T("act.awake.hint");
             RefreshLayout();
         }
     }

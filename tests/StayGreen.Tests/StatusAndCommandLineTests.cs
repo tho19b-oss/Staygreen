@@ -321,15 +321,17 @@ namespace StayGreen.Tests
             Assert.Equal(Path.Combine(Path.GetTempPath(), "staygreen-selftest.txt"), CommandLine.DefaultSelfTestPath);
         }
 
+        // Auto-Stopp liegt auf der Seite "Zeitplan" (Index 1); die alten Namen und Nummern zeigen dorthin.
         [Theory]
         [InlineData("0", 0)]
         [InlineData("activity", 0)]
         [InlineData("Schedule", 1)]
         [InlineData("zeitplan", 1)]
-        [InlineData("2", 2)]
-        [InlineData("auto-stopp", 2)]
-        [InlineData("system", 3)]
-        [InlineData("3", 3)]
+        [InlineData("2", 1)]
+        [InlineData("stop", 1)]
+        [InlineData("auto-stopp", 1)]
+        [InlineData("system", 2)]
+        [InlineData("3", 2)]
         [InlineData("7", -1)]
         [InlineData("blah", -1)]
         public void Tab_AcceptsNamesAndNumbers(string text, int expected)

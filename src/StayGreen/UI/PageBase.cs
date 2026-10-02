@@ -6,17 +6,17 @@ using StayGreen.Core;
 namespace StayGreen.UI
 {
     /// <summary>
-    /// Gemeinsame Basis der Registerkarten: bindet die Einstellungen, unterdrueckt Aenderungsereignisse beim
-    /// Befuellen der Felder und stellt die uebliche Zeilen-Anordnung bereit.
+    /// Gemeinsame Basis der Seiten (Aktivitaet, Zeitplan, System): bindet die Einstellungen, unterdrueckt
+    /// Aenderungsereignisse beim Befuellen der Felder und stellt Bausteine fuer die Karten bereit.
+    /// Eine Seite ist eine senkrechte Spalte aus Karten; gescrollt wird vom <see cref="ScrollHost"/> darum herum.
     /// </summary>
-    abstract class PageBase : UserControl
+    abstract class PageBase : Stack
     {
         bool _loading;
 
         protected PageBase()
         {
-            Dock = DockStyle.Fill;
-            AutoScroll = true;
+            Gap = 12;
         }
 
         protected Settings S { get; private set; }
@@ -54,98 +54,35 @@ namespace StayGreen.UI
         /// <summary>Setzt alle Beschriftungen in der aktuellen Sprache.</summary>
         public abstract void ApplyTexts();
 
-        /// <summary>Jede Sekunde, solange die Karte sichtbar ist (fuer "naechster Start ..."-Zeilen).</summary>
+        /// <summary>Jede Sekunde, solange die Seite sichtbar ist (fuer "naechster Start ..."-Zeilen).</summary>
         public virtual void Tick(DateTime now, DateTime? autoStopDue)
         {
         }
 
-        // ---------------------------------------------------------------- Layout-Helfer
-
-        TableLayoutPanel _root;
-
-        /// <summary>
-        /// Senkrechte Hauptspalte der Karte. Ihre Hoehe wird nicht ueber AutoSize bestimmt, sondern bei jeder
-        /// Groessen- oder Textaenderung explizit aus der tatsaechlichen Breite berechnet; so stimmt die Hoehe
-        /// auch dann, wenn umbrechende Hinweistexte erst nach dem ersten Layout ihre endgueltige Breite haben.
-        /// </summary>
-        protected TableLayoutPanel CreateRoot()
+        /// <summary>Hoehe neu berechnen lassen (nach geaenderten Texten oder ein-/ausgeblendeten Zeilen).</summary>
+        protected void RefreshLayout()
         {
-            _root = new TableLayoutPanel
+            for (Control c = Parent; c != null; c = c.Parent)
             {
-                AutoSize = false,
-                Dock = DockStyle.None,
-                ColumnCount = 1,
-                Padding = new Padding(8),
-            };
-            _root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
-            Controls.Add(_root);
-            return _root;
-        }
-
-        /// <summary>Hoehe der Hauptspalte neu berechnen (nach geaenderten Texten oder Sichtbarkeiten).</summary>
-        public void RefreshLayout()
-        {
-            if (_root == null || Width <= 0) return;
-
-            // Reicht die Hoehe nicht, erscheint ein senkrechter Balken. Seine Breite gleich von vornherein abziehen,
-            // sonst ragt die Spalte danach seitlich heraus und es entsteht zusaetzlich ein waagerechter Balken.
-            int width = Math.Max(120, Width);
-            int height = _root.GetPreferredSize(new Size(width, 0)).Height;
-            if (height > Height)
-            {
-                width = Math.Max(120, Width - SystemInformation.VerticalScrollBarWidth);
-                height = _root.GetPreferredSize(new Size(width, 0)).Height;
+                var host = c as ScrollHost;
+                if (host != null)
+                {
+                    host.Relayout();
+                    return;
+                }
             }
-            _root.SetBounds(0, 0, width, height);
-            AutoScrollMinSize = new Size(0, height);
         }
 
-        protected override void OnResize(EventArgs e)
-        {
-            base.OnResize(e);
-            RefreshLayout();
-        }
+        // ---------------------------------------------------------------- Bausteine
 
-        protected override void OnVisibleChanged(EventArgs e)
+        protected static SwitchBox CreateSwitch()
         {
-            base.OnVisibleChanged(e);
-            if (Visible) RefreshLayout();
-        }
-
-        protected static void AddRow(TableLayoutPanel table, Control control)
-        {
-            control.Dock = DockStyle.Fill;
-            control.Margin = new Padding(3, 4, 3, 4);
-            table.Controls.Add(control);
-        }
-
-        protected static GroupBox CreateGroup(Control content)
-        {
-            var group = new GroupBox
-            {
-                AutoSize = true,
-                AutoSizeMode = AutoSizeMode.GrowAndShrink,
-                Padding = new Padding(8, 4, 8, 8),
-            };
-            content.Dock = DockStyle.Top;
-            group.Controls.Add(content);
-            return group;
-        }
-
-        protected static TableLayoutPanel CreateGrid(int columns)
-        {
-            var grid = new TableLayoutPanel
-            {
-                AutoSize = true,
-                AutoSizeMode = AutoSizeMode.GrowAndShrink,
-                ColumnCount = columns,
-            };
-            return grid;
+            return new SwitchBox();
         }
 
         protected static Label CreateLabel()
         {
-            return new Label { AutoSize = true, Anchor = AnchorStyles.Left, UseMnemonic = false, Margin = new Padding(3, 6, 6, 6) };
+            return new Label { AutoSize = true, UseMnemonic = false, ForeColor = Theme.Muted };
         }
 
         protected static WrapLabel CreateHint()
@@ -153,9 +90,17 @@ namespace StayGreen.UI
             return new WrapLabel { ForeColor = Theme.Muted };
         }
 
-        protected static CheckBox CreateCheck()
+        protected static FlatButton CreateButton(ButtonKind kind)
         {
-            return new CheckBox { AutoSize = true, UseMnemonic = false };
+            return new FlatButton { Kind = kind };
+        }
+
+        /// <summary>Ein Element mit etwas Luft darueber und darunter als eigene Zeile einer Karte.</summary>
+        protected static Stack Pad(Control content, int top, int bottom)
+        {
+            var row = new Stack { Inset = new Padding(0, top, 0, bottom) };
+            row.Controls.Add(content);
+            return row;
         }
     }
 }

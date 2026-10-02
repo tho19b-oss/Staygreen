@@ -1,75 +1,80 @@
 using System;
+using System.Drawing;
 using System.Windows.Forms;
 using StayGreen.Core;
 
 namespace StayGreen.UI
 {
-    /// <summary>Zeitfenster, in denen aktiv gehalten wird (z. B. Mo-Fr 08:00-17:00).</summary>
+    /// <summary>Zeitfenster, in denen aktiv gehalten wird (z. B. Mo-Fr 08:00-17:00). Liegt auf der Karte "Zeitplan".</summary>
     sealed class SchedulePage : PageBase
     {
-        readonly CheckBox _enable = CreateCheck();
-        readonly WrapLabel _hint = CreateHint();
-        readonly ListBox _list = new ListBox { IntegralHeight = false, Height = 104 };
-        readonly GroupBox _group;
-        readonly CheckBox[] _days = new CheckBox[7];
+        readonly Card _card = new Card();
+        readonly Card _editCard = new Card();
+
+        readonly SwitchBox _enable = CreateSwitch();
+        readonly SettingRow _enableRow;
+        readonly ListBox _list = new ListBox
+        {
+            BorderStyle = BorderStyle.None,
+            DrawMode = DrawMode.OwnerDrawFixed,
+            IntegralHeight = false,
+            Dock = DockStyle.Fill,
+            BackColor = Theme.Card,
+        };
+        readonly Frame _frame = new Frame();
+        readonly Stack _listRow;
+        readonly WrapLabel _info = CreateHint();
+
+        readonly ChipBox[] _days = new ChipBox[7];
         readonly Label _fromLabel = CreateLabel();
         readonly Label _toLabel = CreateLabel();
         readonly DateTimePicker _from = CreateTimePicker();
         readonly DateTimePicker _to = CreateTimePicker();
-        readonly Button _add = CreateButton();
-        readonly Button _update = CreateButton();
-        readonly Button _remove = CreateButton();
-        readonly Button _preset = CreateButton();
+        readonly FlatButton _add = CreateButton(ButtonKind.Primary);
+        readonly FlatButton _update = CreateButton(ButtonKind.Secondary);
+        readonly FlatButton _remove = CreateButton(ButtonKind.Secondary);
+        readonly FlatButton _preset = CreateButton(ButtonKind.Secondary);
+        readonly WrapLabel _daysLabel = new WrapLabel { ForeColor = Theme.Text };
         readonly WrapLabel _midnightHint = CreateHint();
         readonly WrapLabel _error = new WrapLabel { ForeColor = Theme.Red };
-        readonly WrapLabel _info = new WrapLabel();
 
         public SchedulePage()
         {
-            TableLayoutPanel root = CreateRoot();
+            _enableRow = new SettingRow(_enable);
+            _card.AddRow(_enableRow);
 
-            _list.Margin = new Padding(3, 4, 3, 4);
+            _frame.Height = Dpi.Px(128);
+            _frame.Controls.Add(_list);
+            _list.ItemHeight = Dpi.Px(32);
+            _list.DrawItem += DrawRule;
+            _listRow = Pad(_frame, 4, 6);
+            _card.AddRow(_listRow);
+            _card.Add(Pad(_info, 0, 2));
 
-            var dayFlow = new FlowLayoutPanel { AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, WrapContents = true, Dock = DockStyle.Top };
+            var dayRow = new InlineRow { Gap = 6, Inset = new Padding(0, 2, 0, 6) };
             for (int i = 0; i < 7; i++)
             {
-                _days[i] = CreateCheck();
-                _days[i].Margin = new Padding(3, 3, 6, 3);
-                dayFlow.Controls.Add(_days[i]);
+                _days[i] = new ChipBox();
+                dayRow.Controls.Add(_days[i]);
             }
+            var timeRow = new InlineRow(_fromLabel, _from, _toLabel, _to) { Inset = new Padding(0, 4, 0, 4) };
+            var buttonRow = new InlineRow(_add, _update, _remove) { Inset = new Padding(0, 6, 0, 2) };
+            var presetRow = new InlineRow(_preset) { Inset = new Padding(0, 6, 0, 2) };
 
-            var timeFlow = new FlowLayoutPanel { AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, WrapContents = false, Dock = DockStyle.Top };
-            timeFlow.Controls.Add(_fromLabel);
-            timeFlow.Controls.Add(_from);
-            timeFlow.Controls.Add(_toLabel);
-            timeFlow.Controls.Add(_to);
-            _from.Margin = new Padding(3, 3, 12, 3);
-            _to.Margin = new Padding(3, 3, 3, 3);
+            _editCard.Add(_daysLabel);
+            _editCard.Add(dayRow);
+            _editCard.Add(timeRow);
+            _editCard.Add(buttonRow);
+            _editCard.Add(presetRow);
+            _editCard.Add(Pad(_midnightHint, 4, 0));
+            _editCard.Add(_error);
 
-            var buttons = new FlowLayoutPanel { AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, WrapContents = true, Dock = DockStyle.Top };
-            buttons.Controls.Add(_add);
-            buttons.Controls.Add(_update);
-            buttons.Controls.Add(_remove);
-            buttons.Controls.Add(_preset);
-
-            var editor = new TableLayoutPanel { AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, ColumnCount = 1 };
-            editor.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
-            editor.Controls.Add(dayFlow);
-            editor.Controls.Add(timeFlow);
-            editor.Controls.Add(buttons);
-            editor.Controls.Add(_midnightHint);
-            _midnightHint.Dock = DockStyle.Fill;
-            _group = CreateGroup(editor);
-
-            AddRow(root, _enable);
-            AddRow(root, _hint);
-            AddRow(root, _list);
-            AddRow(root, _group);
-            AddRow(root, _error);
-            AddRow(root, _info);
+            Controls.Add(_card);
+            Controls.Add(_editCard);
 
             _enable.CheckedChanged += (o, e) =>
             {
+                UpdateVisibility();
                 if (Loading || S == null) return;
                 S.ScheduleEnabled = _enable.Checked;
                 Fire();
@@ -109,7 +114,7 @@ namespace StayGreen.UI
             _preset.Click += (o, e) =>
             {
                 S.Rules.Add(ScheduleRule.Weekdays(new TimeSpan(8, 0, 0), new TimeSpan(17, 0, 0)));
-                _error.Text = "";
+                SetError("");
                 RefreshList(S.Rules.Count - 1);
                 Fire();
             };
@@ -122,14 +127,23 @@ namespace StayGreen.UI
                 Format = DateTimePickerFormat.Custom,
                 CustomFormat = "HH:mm",
                 ShowUpDown = true,
-                Width = 72,
-                Anchor = AnchorStyles.Left,
+                Width = Dpi.Px(80),
             };
         }
 
-        static Button CreateButton()
+        void DrawRule(object sender, DrawItemEventArgs e)
         {
-            return new Button { AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, Padding = new Padding(8, 1, 8, 1) };
+            if (e.Index < 0) return;
+            bool selected = (e.State & DrawItemState.Selected) != 0;
+            Rectangle r = e.Bounds;
+            using (var back = new SolidBrush(selected ? Theme.TintFor(StatusKind.Active) : Theme.Card))
+                e.Graphics.FillRectangle(back, r);
+            using (var pen = new Pen(Theme.Divider))
+                e.Graphics.DrawLine(pen, r.Left, r.Bottom - 1, r.Right, r.Bottom - 1);
+            var text = new Rectangle(r.Left + Dpi.Px(10), r.Top, r.Width - Dpi.Px(20), r.Height);
+            TextRenderer.DrawText(e.Graphics, Convert.ToString(_list.Items[e.Index]), e.Font, text, Theme.Text,
+                TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine
+                | TextFormatFlags.NoPrefix | TextFormatFlags.EndEllipsis);
         }
 
         protected override void Populate(Settings s)
@@ -138,6 +152,17 @@ namespace StayGreen.UI
             _enable.Checked = s.ScheduleEnabled;
             RefreshList(s.Rules.Count > 0 ? 0 : -1);
             if (s.Rules.Count == 0) LoadEditor(ScheduleRule.Weekdays(new TimeSpan(8, 0, 0), new TimeSpan(17, 0, 0)));
+            UpdateVisibility();
+        }
+
+        /// <summary>Liste und Editor sind nur sichtbar, solange der Zeitplan eingeschaltet ist.</summary>
+        void UpdateVisibility()
+        {
+            bool on = _enable.Checked;
+            _listRow.Visible = on;
+            _info.Parent.Visible = on && _info.Text.Length > 0;
+            _editCard.Visible = on;
+            RefreshLayout();
         }
 
         void RefreshList(int select)
@@ -169,7 +194,7 @@ namespace StayGreen.UI
                 _from.Value = DateTime.Today + rule.Start;
                 _to.Value = DateTime.Today + rule.End;
             });
-            _error.Text = "";
+            SetError("");
         }
 
         ScheduleRule ReadEditor()
@@ -183,23 +208,33 @@ namespace StayGreen.UI
 
             if (!rule.AnyDay)
             {
-                _error.Text = Loc.T("sch.err.nodays");
+                SetError(Loc.T("sch.err.nodays"));
                 return null;
             }
             if (rule.Start == rule.End)
             {
-                _error.Text = Loc.T("sch.err.sametime");
+                SetError(Loc.T("sch.err.sametime"));
                 return null;
             }
-            _error.Text = "";
+            SetError("");
             return rule;
+        }
+
+        void SetError(string text)
+        {
+            _error.Text = text;
+            _error.Visible = text.Length > 0;
+            RefreshLayout();
         }
 
         public override void ApplyTexts()
         {
-            _enable.Text = Loc.T("sch.enable");
-            _hint.Text = Loc.T("sch.hint");
-            _group.Text = Loc.T("sch.grp.edit");
+            _card.Text = Loc.T("sch.grp.title");
+            _enableRow.Title = Loc.T("sch.enable");
+            _enableRow.Caption = Loc.T("sch.hint");
+
+            _editCard.Text = Loc.T("sch.grp.edit");
+            _daysLabel.Text = Loc.T("sch.days");
             for (int i = 0; i < 7; i++) _days[i].Text = Loc.DayShort(i);
             _fromLabel.Text = Loc.T("sch.from");
             _toLabel.Text = Loc.T("sch.to");
@@ -208,6 +243,7 @@ namespace StayGreen.UI
             _remove.Text = Loc.T("sch.remove");
             _preset.Text = Loc.T("sch.preset");
             _midnightHint.Text = Loc.T("sch.hint.midnight");
+            _error.Visible = _error.Text.Length > 0;
             if (S != null)
             {
                 int selected = _list.SelectedIndex;
@@ -222,7 +258,10 @@ namespace StayGreen.UI
             string line = S.Rules.Count == 0 && S.ScheduleEnabled
                 ? Loc.T("sch.none")
                 : StatusBuilder.ScheduleLine(S, now);
-            _info.Text = line ?? "";
+            line = line ?? "";
+            if (_info.Text == line) return;
+            _info.Text = line;
+            UpdateVisibility();
         }
     }
 }

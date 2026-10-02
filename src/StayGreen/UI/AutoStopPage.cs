@@ -4,103 +4,78 @@ using StayGreen.Core;
 
 namespace StayGreen.UI
 {
-    /// <summary>Automatisch beenden: taeglich oder einmalig, optional mit Teams beenden, Sperren, Herunterfahren.</summary>
+    /// <summary>Feierabend: automatisch beenden, taeglich oder einmalig, optional mit Teams beenden, Sperren, Herunterfahren.</summary>
     sealed class AutoStopPage : PageBase
     {
-        readonly CheckBox _enable = CreateCheck();
-        readonly WrapLabel _intro = CreateHint();
-        readonly RadioButton _daily = new RadioButton { AutoSize = true, UseMnemonic = false };
-        readonly RadioButton _once = new RadioButton { AutoSize = true, UseMnemonic = false };
-        readonly DateTimePicker _dailyTime = new DateTimePicker
-        {
-            Format = DateTimePickerFormat.Custom,
-            CustomFormat = "HH:mm",
-            ShowUpDown = true,
-            Width = 72,
-            Anchor = AnchorStyles.Left,
-        };
-        // Kurzes Datum nach den Windows-Regionseinstellungen (nicht fest deutsch, auch wenn die Oberflaeche englisch ist).
+        readonly Card _card = new Card();
+
+        readonly SwitchBox _enable = CreateSwitch();
+        readonly Segmented _when = new Segmented { AutoFit = true };
+        readonly DateTimePicker _dailyTime = CreateTimePicker();
         readonly DateTimePicker _onceDate = new DateTimePicker
         {
+            // Kurzes Datum nach den Windows-Regionseinstellungen (nicht fest deutsch, auch wenn die Oberflaeche englisch ist).
             Format = DateTimePickerFormat.Short,
-            Width = 120,
+            Width = Dpi.Px(118),
         };
-        readonly DateTimePicker _onceTime = new DateTimePicker
-        {
-            Format = DateTimePickerFormat.Custom,
-            CustomFormat = "HH:mm",
-            ShowUpDown = true,
-            Width = 72,
-        };
-        readonly GroupBox _group;
-        readonly CheckBox _teams = CreateCheck();
-        readonly CheckBox _lock = CreateCheck();
-        readonly CheckBox _shutdown = CreateCheck();
-        readonly CheckBox _exit = CreateCheck();
-        readonly WrapLabel _shutdownHint = CreateHint();
-        readonly WrapLabel _info = new WrapLabel();
-        readonly TableLayoutPanel _timing;
+        readonly DateTimePicker _onceTime = CreateTimePicker();
+        readonly SwitchBox _teams = CreateSwitch();
+        readonly SwitchBox _lock = CreateSwitch();
+        readonly SwitchBox _shutdown = CreateSwitch();
+        readonly SwitchBox _exit = CreateSwitch();
+        readonly WrapLabel _actionsHeader = new WrapLabel { ForeColor = Theme.MutedStrong };
+        readonly WrapLabel _info = CreateHint();
+
+        readonly SettingRow _enableRow;
+        readonly SettingRow _whenRow;
+        readonly SettingRow _timeRow;
+        readonly SettingRow _dateRow;
+        readonly SettingRow _teamsRow;
+        readonly SettingRow _lockRow;
+        readonly SettingRow _shutdownRow;
+        readonly SettingRow _exitRow;
+        readonly Stack _actionsHeaderRow;
+        readonly Stack _infoRow;
 
         public AutoStopPage()
         {
-            TableLayoutPanel root = CreateRoot();
+            _enableRow = new SettingRow(_enable);
+            _whenRow = new SettingRow(_when);
+            _timeRow = new SettingRow(new InlineRow(_dailyTime));
+            _dateRow = new SettingRow(new InlineRow(_onceDate, _onceTime));
+            _teamsRow = new SettingRow(_teams);
+            _lockRow = new SettingRow(_lock);
+            _shutdownRow = new SettingRow(_shutdown);
+            _exitRow = new SettingRow(_exit);
+            _actionsHeaderRow = Pad(_actionsHeader, 12, 0);
+            _infoRow = Pad(_info, 4, 2);
 
-            _timing = CreateGrid(2);
-            _timing.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-            _timing.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
-            _daily.Anchor = AnchorStyles.Left;
-            _once.Anchor = AnchorStyles.Left;
-            _daily.Margin = new Padding(20, 4, 12, 4);
-            _once.Margin = new Padding(20, 4, 12, 4);
-            _timing.Controls.Add(_daily, 0, 0);
-            _timing.Controls.Add(_dailyTime, 1, 0);
-            _timing.Controls.Add(_once, 0, 1);
-            var onceFlow = new FlowLayoutPanel { AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, WrapContents = false, Anchor = AnchorStyles.Left };
-            _onceDate.Margin = new Padding(3, 3, 8, 3);
-            onceFlow.Controls.Add(_onceDate);
-            onceFlow.Controls.Add(_onceTime);
-            _timing.Controls.Add(onceFlow, 1, 1);
-
-            var actions = new TableLayoutPanel { AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, ColumnCount = 1 };
-            actions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
-            foreach (CheckBox box in new[] { _teams, _lock, _shutdown })
-            {
-                box.Margin = new Padding(3, 3, 3, 3);
-                actions.Controls.Add(box);
-            }
-            actions.Controls.Add(_shutdownHint);
-            _shutdownHint.Margin = new Padding(22, 0, 3, 6);
-            _shutdownHint.Dock = DockStyle.Fill;
-            _exit.Margin = new Padding(3, 3, 3, 3);
-            actions.Controls.Add(_exit);
-            _group = CreateGroup(actions);
-
-            AddRow(root, _enable);
-            AddRow(root, _intro);
-            AddRow(root, _timing);
-            AddRow(root, _group);
-            AddRow(root, _info);
+            _card.AddRow(_enableRow);
+            _card.AddRow(_whenRow);
+            _card.AddRow(_timeRow);
+            _card.AddRow(_dateRow);
+            _card.AddRow(_actionsHeaderRow);
+            _card.AddRow(_teamsRow);
+            _card.AddRow(_lockRow);
+            _card.AddRow(_shutdownRow);
+            _card.AddRow(_exitRow);
+            _card.Add(_infoRow);
+            Controls.Add(_card);
 
             _enable.CheckedChanged += (o, e) =>
             {
+                UpdateVisibility();
                 if (Loading || S == null) return;
                 S.AutoStopEnabled = _enable.Checked;
-                UpdateEnabled();
                 Fire();
             };
-            _daily.CheckedChanged += (o, e) =>
+            _when.SelectedIndexChanged += (o, e) =>
             {
-                if (Loading || S == null || !_daily.Checked) return;
-                S.AutoStopTiming = StopTiming.Daily;
-                UpdateEnabled();
-                Fire();
-            };
-            _once.CheckedChanged += (o, e) =>
-            {
-                if (Loading || S == null || !_once.Checked) return;
-                S.AutoStopTiming = StopTiming.Once;
-                S.AutoStopOnce = OnceValue();
-                UpdateEnabled();
+                UpdateVisibility();
+                if (Loading || S == null) return;
+                bool once = _when.SelectedIndex == 1;
+                S.AutoStopTiming = once ? StopTiming.Once : StopTiming.Daily;
+                if (once) S.AutoStopOnce = OnceValue();
                 Fire();
             };
             _dailyTime.ValueChanged += (o, e) =>
@@ -124,6 +99,17 @@ namespace StayGreen.UI
             _exit.CheckedChanged += (o, e) => { if (!Loading && S != null) { S.StopExitApp = _exit.Checked; Fire(); } };
         }
 
+        static DateTimePicker CreateTimePicker()
+        {
+            return new DateTimePicker
+            {
+                Format = DateTimePickerFormat.Custom,
+                CustomFormat = "HH:mm",
+                ShowUpDown = true,
+                Width = Dpi.Px(80),
+            };
+        }
+
         DateTime OnceValue()
         {
             DateTime time = _onceTime.Value;
@@ -141,8 +127,7 @@ namespace StayGreen.UI
         {
             ApplyTexts();
             _enable.Checked = s.AutoStopEnabled;
-            _daily.Checked = s.AutoStopTiming == StopTiming.Daily;
-            _once.Checked = s.AutoStopTiming == StopTiming.Once;
+            _when.SelectedIndex = s.AutoStopTiming == StopTiming.Once ? 1 : 0;
             _dailyTime.Value = DateTime.Today + s.AutoStopTime;
             DateTime once = s.AutoStopOnce == DateTime.MinValue ? SuggestOnce() : s.AutoStopOnce;
             once = once < _onceDate.MinDate ? _onceDate.MinDate : (once > _onceDate.MaxDate ? _onceDate.MaxDate : once);
@@ -152,38 +137,55 @@ namespace StayGreen.UI
             _lock.Checked = s.StopLock;
             _shutdown.Checked = s.StopShutdown;
             _exit.Checked = s.StopExitApp;
-            UpdateEnabled();
+            UpdateVisibility();
         }
 
-        void UpdateEnabled()
+        /// <summary>Die Einzelheiten sind nur sichtbar, solange der Auto-Stopp eingeschaltet ist.</summary>
+        void UpdateVisibility()
         {
             bool on = _enable.Checked;
-            _timing.Enabled = on;
-            _group.Enabled = on;
-            _dailyTime.Enabled = _daily.Checked;
-            _onceDate.Enabled = _once.Checked;
-            _onceTime.Enabled = _once.Checked;
+            bool once = _when.SelectedIndex == 1;
+            _whenRow.Visible = on;
+            _timeRow.Visible = on && !once;
+            _dateRow.Visible = on && once;
+            _actionsHeaderRow.Visible = on;
+            _teamsRow.Visible = on;
+            _lockRow.Visible = on;
+            _shutdownRow.Visible = on;
+            _exitRow.Visible = on;
+            _infoRow.Visible = on && _info.Text.Length > 0;
+            RefreshLayout();
         }
 
         public override void ApplyTexts()
         {
-            _enable.Text = Loc.T("stop.enable");
-            _intro.Text = Loc.T("stop.intro");
-            _daily.Text = Loc.T("stop.daily");
-            _once.Text = Loc.T("stop.once");
-            _group.Text = Loc.T("stop.grp.actions");
-            _teams.Text = Loc.T("stop.teams");
-            _lock.Text = Loc.T("stop.lock");
-            _shutdown.Text = Loc.T("stop.shutdown");
-            _shutdownHint.Text = Loc.T("stop.shutdown.hint");
-            _exit.Text = Loc.T("stop.exit");
+            _card.Text = Loc.T("stop.grp.title");
+            _enableRow.Title = Loc.T("stop.enable");
+            _enableRow.Caption = Loc.T("stop.intro");
+
+            _when.Items = new[] { Loc.T("stop.mode.daily"), Loc.T("stop.mode.once") };
+            _whenRow.Title = Loc.T("stop.when");
+            _timeRow.Title = Loc.T("stop.time");
+            _dateRow.Title = Loc.T("stop.datetime");
+
+            _actionsHeader.Text = Loc.T("stop.grp.actions");
+            _teamsRow.Title = Loc.T("stop.teams");
+            _teamsRow.Caption = Loc.T("stop.teams.hint");
+            _lockRow.Title = Loc.T("stop.lock");
+            _shutdownRow.Title = Loc.T("stop.shutdown");
+            _shutdownRow.Caption = Loc.T("stop.shutdown.hint");
+            _exitRow.Title = Loc.T("stop.exit");
+            _exitRow.Caption = Loc.T("stop.exit.hint");
             RefreshLayout();
         }
 
         public override void Tick(DateTime now, DateTime? autoStopDue)
         {
             if (S == null) return;
-            _info.Text = StatusBuilder.AutoStopLine(S, now, autoStopDue) ?? "";
+            string line = StatusBuilder.AutoStopLine(S, now, autoStopDue) ?? "";
+            if (_info.Text == line) return;
+            _info.Text = line;
+            UpdateVisibility();
         }
     }
 }

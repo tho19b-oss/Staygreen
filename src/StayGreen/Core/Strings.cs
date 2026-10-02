@@ -9,7 +9,6 @@ namespace StayGreen.Core
             new[] { "app.title", "StayGreen", "StayGreen" },
             new[] { "tab.activity", "Aktivität", "Activity" },
             new[] { "tab.schedule", "Zeitplan", "Schedule" },
-            new[] { "tab.stop", "Auto-Stopp", "Auto-stop" },
             new[] { "tab.system", "System", "System" },
             new[] { "btn.start", "Starten", "Start" },
             new[] { "btn.stop", "Stoppen", "Stop" },
@@ -28,7 +27,7 @@ namespace StayGreen.Core
                 + "  --minimized        Nur im Infobereich starten (ohne Fenster)\r\n"
                 + "  --settings <Datei> Andere Einstellungsdatei verwenden\r\n"
                 + "  --lang de|en       Sprache für diesen Start\r\n"
-                + "  --tab <Name>       Registerkarte öffnen: activity, schedule, stop, system (oder 0-3)\r\n"
+                + "  --tab <Name>       Seite öffnen: activity, schedule (mit Auto-Stopp), system\r\n"
                 + "  --selftest [Datei] Selbsttest ausführen und Ergebnis speichern\r\n"
                 + "  --autostart        (intern) Start durch den Windows-Autostart\r\n"
                 + "  --help             Diese Hilfe\r\n",
@@ -38,7 +37,7 @@ namespace StayGreen.Core
                 + "  --minimized        Start in the notification area only (no window)\r\n"
                 + "  --settings <file>  Use a different settings file\r\n"
                 + "  --lang de|en       Language for this start\r\n"
-                + "  --tab <name>       Open a tab: activity, schedule, stop, system (or 0-3)\r\n"
+                + "  --tab <name>       Open a page: activity, schedule (incl. auto-stop), system\r\n"
                 + "  --selftest [file]  Run the self-test and save the result\r\n"
                 + "  --autostart        (internal) Start by Windows autostart\r\n"
                 + "  --help             This help\r\n" },
@@ -101,14 +100,18 @@ namespace StayGreen.Core
 
             // ---- Karte "Aktivität" ----
             new[] { "act.grp.method", "So bleibst du grün", "How to stay green" },
-            new[] { "act.mode", "Methode:", "Method:" },
+            new[] { "act.grp.behavior", "Verhalten", "Behavior" },
+            new[] { "act.mode", "Methode", "Method" },
             new[] { "act.mode.key", "Tastendruck (F15), unsichtbar", "Key press (F15), invisible" },
             new[] { "act.mode.mouse", "Mausbewegung (wenige Pixel)", "Mouse movement (a few pixels)" },
             new[] { "act.mode.both", "Taste und Maus (empfohlen)", "Key and mouse (recommended)" },
-            new[] { "act.interval", "Alle:", "Every:" },
+            new[] { "act.interval", "Intervall", "Interval" },
             new[] { "act.unit.sec", "Sekunden", "seconds" },
-            new[] { "act.pixels", "Mausweg:", "Mouse travel:" },
-            new[] { "act.unit.px", "Pixel (hin und zurück)", "pixels (there and back)" },
+            new[] { "act.pixels", "Mausweg", "Mouse travel" },
+            new[] { "act.pixels.hint",
+                "So weit zuckt die Maus: wenige Pixel hin und sofort zurück.",
+                "How far the mouse twitches: a few pixels there and straight back." },
+            new[] { "act.unit.px", "Pixel", "pixels" },
             new[] { "act.hint",
                 "Teams setzt dich nach etwa 5 Minuten ohne Eingabe auf „Abwesend“. Ein Intervall von 30 bis 60 Sekunden reicht sicher.",
                 "Teams sets you to \"Away\" after about 5 minutes without input. An interval of 30 to 60 seconds is plenty." },
@@ -121,17 +124,23 @@ namespace StayGreen.Core
                 "Verhindert Standby, Bildschirmschoner und das automatische Sperren bei Inaktivität. Sperrst du den PC selbst (Win+L), zeigt Teams trotzdem „Abwesend“.",
                 "Prevents standby, screen saver and automatic locking due to inactivity. If you lock the PC yourself (Win+L), Teams still shows \"Away\"." },
             new[] { "act.test", "Jetzt testen", "Test now" },
+            new[] { "act.test.title", "Eingabe testen", "Test input" },
+            new[] { "act.test.hint",
+                "Sendet jetzt eine Eingabe und zeigt, ob Windows sie annimmt.",
+                "Sends an input now and shows whether Windows accepts it." },
             new[] { "act.test.ok", "Eingabe gesendet.", "Input sent." },
             new[] { "act.test.fail",
                 "Windows hat die Eingabe abgelehnt (PC gesperrt oder Zugriff blockiert).",
                 "Windows rejected the input (PC locked or access blocked)." },
 
             // ---- Karte "Zeitplan" ----
+            new[] { "sch.grp.title", "Aktive Zeiten", "Active hours" },
             new[] { "sch.enable", "Nur in diesen Zeitfenstern aktiv halten", "Only keep active during these time windows" },
             new[] { "sch.hint",
                 "Außerhalb der Fenster pausiert StayGreen: Teams zeigt dann wie gewohnt „Abwesend“ und der PC darf in den Standby.",
                 "Outside the windows StayGreen pauses: Teams then shows \"Away\" as usual and the PC may go to standby." },
             new[] { "sch.grp.edit", "Zeitfenster bearbeiten", "Edit time window" },
+            new[] { "sch.days", "Wochentage", "Weekdays" },
             new[] { "sch.from", "von", "from" },
             new[] { "sch.to", "bis", "to" },
             new[] { "sch.add", "Hinzufügen", "Add" },
@@ -148,24 +157,38 @@ namespace StayGreen.Core
                 "No time window yet. The schedule only takes effect once there is at least one." },
 
             // ---- Karte "Auto-Stopp" ----
+            new[] { "stop.grp.title", "Feierabend: Auto-Stopp", "End of day: auto-stop" },
             new[] { "stop.enable", "StayGreen automatisch beenden", "Stop StayGreen automatically" },
             new[] { "stop.intro",
                 "Beendet das Aktivhalten zur gewünschten Zeit, zum Beispiel zum Feierabend.",
                 "Stops holding at the chosen time, for example at the end of the workday." },
-            new[] { "stop.daily", "Täglich um", "Every day at" },
-            new[] { "stop.once", "Einmalig am", "Once on" },
+            new[] { "stop.when", "Wann", "When" },
+            new[] { "stop.mode.daily", "Täglich", "Daily" },
+            new[] { "stop.mode.once", "Einmalig", "Once" },
+            new[] { "stop.time", "Uhrzeit", "Time" },
+            new[] { "stop.datetime", "Datum und Uhrzeit", "Date and time" },
             new[] { "stop.grp.actions", "Dabei zusätzlich", "Additionally" },
-            new[] { "stop.teams", "Teams beenden (Status wechselt auf „Offline“)", "Close Teams (status changes to \"Offline\")" },
+            new[] { "stop.teams", "Teams beenden", "Close Teams" },
+            new[] { "stop.teams.hint",
+                "Dein Status wechselt dann auf „Offline“.",
+                "Your status then changes to \"Offline\"." },
             new[] { "stop.lock", "Windows sperren", "Lock Windows" },
             new[] { "stop.shutdown", "Computer herunterfahren", "Shut down the computer" },
             new[] { "stop.shutdown.hint",
                 "Vorher läuft ein Countdown von 60 Sekunden, den du abbrechen kannst. Programme mit ungespeicherten Daten werden nicht zwangsweise geschlossen.",
                 "A 60-second countdown runs first, which you can cancel. Programs with unsaved data are not closed by force." },
             new[] { "stop.exit", "StayGreen beenden", "Exit StayGreen" },
+            new[] { "stop.exit.hint",
+                "Das Programm schließt sich ganz. Am nächsten Tag läuft es nur, wenn du es startest oder der Autostart an ist.",
+                "The program closes completely. Tomorrow it only runs if you start it or autostart is on." },
 
             // ---- Karte "System" ----
+            new[] { "sys.grp.start", "Start", "Startup" },
             new[] { "sys.startonlaunch", "Beim Öffnen automatisch starten", "Start automatically when opened" },
             new[] { "sys.autostart", "Mit Windows starten (Autostart)", "Start with Windows (autostart)" },
+            new[] { "sys.autostart.hint",
+                "Ohne Administratorrechte, nur für dein Benutzerkonto.",
+                "No administrator rights needed, only for your user account." },
             new[] { "sys.autostart.fail",
                 "Der Autostart konnte nicht eingerichtet werden (möglicherweise durch eine Richtlinie blockiert).",
                 "Autostart could not be set up (possibly blocked by a policy)." },
@@ -174,6 +197,7 @@ namespace StayGreen.Core
             new[] { "sys.grp.log", "Protokoll", "Log" },
             new[] { "sys.log", "Start und Stopp in eine Textdatei schreiben", "Write start and stop to a text file" },
             new[] { "sys.log.open", "Öffnen", "Open" },
+            new[] { "sys.log.change", "Ändern …", "Change …" },
             new[] { "sys.log.nofile", "Die Protokolldatei existiert noch nicht:\n{0}", "The log file does not exist yet:\n{0}" },
             new[] { "sys.log.browse.title", "Protokolldatei wählen", "Choose log file" },
             new[] { "sys.log.browse.filter",
@@ -185,9 +209,10 @@ namespace StayGreen.Core
             new[] { "sys.hotkey.fail",
                 "{0} konnte nicht angemeldet werden (schon von einem anderen Programm belegt?).",
                 "{0} could not be registered (already used by another program?)." },
-            new[] { "sys.language", "Sprache:", "Language:" },
+            new[] { "sys.grp.general", "Sprache und Daten", "Language and data" },
+            new[] { "sys.language", "Sprache", "Language" },
             new[] { "sys.lang.auto", "Automatisch (Windows)", "Automatic (Windows)" },
-            new[] { "sys.openfolder", "Einstellungsordner öffnen", "Open settings folder" },
+            new[] { "sys.folder", "Einstellungsordner", "Settings folder" },
             new[] { "sys.portable",
                 "Portabler Modus: Die Einstellungen liegen neben der EXE.",
                 "Portable mode: settings are stored next to the EXE." },
