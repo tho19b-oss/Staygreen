@@ -51,7 +51,7 @@ namespace StayGreen.UI
             _card.AddRow(_listRow);
             _card.Add(Pad(_info, 0, 2));
 
-            var dayRow = new InlineRow { Gap = 6, Inset = new Padding(0, 2, 0, 6) };
+            var dayRow = new EvenRow { Inset = new Padding(0, 2, 0, 6) };
             for (int i = 0; i < 7; i++)
             {
                 _days[i] = new ChipBox();

@@ -450,6 +450,48 @@ namespace StayGreen.UI
         }
     }
 
+    /// <summary>Waagerechte Reihe, in der alle Elemente gleich breit sind und die ganze Breite fuellen (Wochentage).</summary>
+    sealed class EvenRow : LayoutPanel
+    {
+        public EvenRow()
+        {
+            Gap = 6;
+        }
+
+        /// <summary>Abstand zwischen den Elementen in logischen Pixeln.</summary>
+        public int Gap { get; set; }
+
+        public override int MeasureHeight(int width)
+        {
+            int h = 0;
+            foreach (Control c in Controls)
+                if (c.Visible) h = Math.Max(h, c.Height);
+            return h + Dpi.Px(Inset.Vertical);
+        }
+
+        protected override void DoLayout()
+        {
+            int count = 0;
+            foreach (Control c in Controls)
+                if (c.Visible) count++;
+            if (count == 0) return;
+
+            int gap = Dpi.Px(Gap);
+            int total = Math.Max(count, ClientSize.Width - gap * (count - 1));
+            int top = Dpi.Px(Inset.Top);
+            int index = 0;
+            foreach (Control c in Controls)
+            {
+                if (!c.Visible) continue;
+                // Ganzzahlig verteilen, damit die Reihe auf den Pixel genau die Breite fuellt.
+                int x = total * index / count + gap * index;
+                int right = total * (index + 1) / count + gap * index;
+                c.SetBounds(x, top, right - x, c.Height);
+                index++;
+            }
+        }
+    }
+
     /// <summary>Rahmen um ein einzelnes Steuerelement (z. B. die Liste der Zeitfenster).</summary>
     sealed class Frame : Panel
     {

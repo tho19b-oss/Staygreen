@@ -15,7 +15,7 @@ namespace StayGreen.UI
         readonly WrapLabel _title = new WrapLabel();
         readonly WrapLabel _detail = new WrapLabel();
         readonly WrapLabel _plan = new WrapLabel();
-        readonly FlatButton _toggle = new FlatButton { MinWidth = 112 };
+        readonly FlatButton _toggle = new FlatButton { MinWidth = 100 };
 
         Color _tint = Theme.TintFor(StatusKind.Stopped);
         Color _tintBorder = Theme.TintBorderFor(StatusKind.Stopped);
@@ -86,7 +86,7 @@ namespace StayGreen.UI
         void UpdateFonts()
         {
             Font oldTitle = _title.Font;
-            _title.Font = new Font(Font.FontFamily, Font.Size + 3.5f, FontStyle.Bold);
+            _title.Font = new Font(Font.FontFamily, Font.Size + 2.5f, FontStyle.Bold);
             if (!ReferenceEquals(oldTitle, Font)) oldTitle.Dispose();
 
             Font oldToggle = _toggle.Font;
