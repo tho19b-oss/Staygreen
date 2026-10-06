@@ -181,7 +181,6 @@ namespace StayGreen.UI
         {
             var form = new MainForm(this);
             form.ActivityPage.TestRequested = TestInput;
-            form.ActivityPage.PauseRequested = minutes => PauseFor(minutes, Loc.T("reason.manual"));
             form.SystemPage.DefaultLogPath = () => SettingsStore.DefaultLogPath;
             form.SystemPage.OpenFolderRequested = OpenSettingsFolder;
             form.SystemPage.OpenLogRequested = OpenLogFile;
@@ -274,9 +273,11 @@ namespace StayGreen.UI
             RefreshUi(DateTime.Now);
         }
 
-        bool TestInput()
+        /// <summary>"Eingabe testen": blockiert kurz (gut 300 ms), bis klar ist, ob Windows die Eingabe als Aktivitaet wertet.</summary>
+        InputTestResult TestInput()
         {
-            return _input.SendActivity(_settings.Mode, _settings.MousePixels, _settings.InputKey);
+            Stopwatch clock = Stopwatch.StartNew();
+            return InputTest.Run(_input, _settings, () => clock.Elapsed, Thread.Sleep);
         }
 
         // ------------------------------------------------------------------ Befehle von einem zweiten Start

@@ -1,18 +1,15 @@
 using System;
+using System.Globalization;
 using System.Windows.Forms;
 using StayGreen.Core;
 
 namespace StayGreen.UI
 {
-    /// <summary>Methode, Intervall, intelligenter Modus, Wach-Halten, Teams-Pruefung, Sicherheitsnetz und Pause.</summary>
+    /// <summary>Methode, Intervall, intelligenter Modus, Wach-Halten, Teams-Pruefung und Sicherheitsnetz.</summary>
     sealed class ActivityPage : PageBase
     {
-        /// <summary>Dauern der Pausen-Knoepfe in Minuten.</summary>
-        static readonly int[] PauseMinutes = { 30, 60, 120 };
-
         readonly Card _methodCard = new Card();
         readonly Card _behaviorCard = new Card();
-        readonly Card _pauseCard = new Card();
 
         readonly ComboBox _mode = Style(new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList });
         readonly ComboBox _key = Style(new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList });
@@ -26,7 +23,6 @@ namespace StayGreen.UI
         readonly SwitchBox _awake = CreateSwitch();
         readonly SwitchBox _teamsOnly = CreateSwitch();
         readonly FlatButton _test = CreateButton(ButtonKind.Secondary);
-        readonly FlatButton[] _pauseButtons = new FlatButton[PauseMinutes.Length];
 
         readonly SettingRow _modeRow;
         readonly SettingRow _keyRow;
@@ -37,13 +33,9 @@ namespace StayGreen.UI
         readonly SettingRow _awakeRow;
         readonly SettingRow _teamsRow;
         readonly SettingRow _maxRunRow;
-        readonly SettingRow _pauseRow;
 
-        /// <summary>Wird vom Hauptfenster gesetzt: erzeugt eine Eingabe und meldet, ob Windows sie angenommen hat.</summary>
-        public Func<bool> TestRequested;
-
-        /// <summary>Wird vom Hauptfenster gesetzt: pausiert fuer so viele Minuten.</summary>
-        public Action<int> PauseRequested;
+        /// <summary>Wird vom Hauptfenster gesetzt: erzeugt eine Eingabe und meldet, ob Windows sie angenommen und als Aktivitaet gewertet hat.</summary>
+        public Func<InputTestResult> TestRequested;
 
         public ActivityPage()
         {
@@ -62,7 +54,6 @@ namespace StayGreen.UI
             _awakeRow = new SettingRow(_awake);
             _teamsRow = new SettingRow(_teamsOnly);
             _maxRunRow = new SettingRow(new InlineRow(_maxRun, _hoursUnit));
-            _pauseRow = new SettingRow(null);
 
             _methodCard.AddRow(_modeRow);
             _methodCard.AddRow(_keyRow);
@@ -74,34 +65,22 @@ namespace StayGreen.UI
             _behaviorCard.AddRow(_teamsRow);
             _behaviorCard.AddRow(_maxRunRow);
 
-            for (int i = 0; i < PauseMinutes.Length; i++)
-            {
-                int minutes = PauseMinutes[i];
-                _pauseButtons[i] = CreateButton(ButtonKind.Secondary);
-                _pauseButtons[i].Click += (o, e) =>
-                {
-                    Action<int> handler = PauseRequested;
-                    if (handler != null) handler(minutes);
-                };
-            }
-            _pauseCard.AddRow(_pauseRow);
-            _pauseCard.Add(Pad(new InlineRow(_pauseButtons), 0, 10));
-
             Controls.Add(_methodCard);
             Controls.Add(_behaviorCard);
-            Controls.Add(_pauseCard);
 
             _mode.SelectedIndexChanged += (o, e) =>
             {
                 if (Loading || S == null || _mode.SelectedIndex < 0) return;
                 S.Mode = (ActivityMode)_mode.SelectedIndex;
                 UpdateEnabled();
+                ResetTestResult();
                 Fire();
             };
             _key.SelectedIndexChanged += (o, e) =>
             {
                 if (Loading || S == null || _key.SelectedIndex < 0) return;
                 S.InputKey = (ActivityKey)_key.SelectedIndex;
+                ResetTestResult();
                 Fire();
             };
             _interval.ValueChanged += (o, e) =>
@@ -115,6 +94,7 @@ namespace StayGreen.UI
             {
                 if (Loading || S == null) return;
                 S.MousePixels = (int)_pixels.Value;
+                ResetTestResult();
                 Fire();
             };
             _smart.CheckedChanged += (o, e) =>
@@ -143,11 +123,30 @@ namespace StayGreen.UI
             };
             _test.Click += (o, e) =>
             {
-                bool ok = TestRequested != null && TestRequested();
-                _testRow.Caption = Loc.T(ok ? "act.test.ok" : "act.test.fail");
-                _testRow.CaptionColor = ok ? Theme.GreenButton : Theme.Red;
-                RefreshLayout();
+                InputTestResult result = TestRequested != null ? TestRequested() : InputTestResult.Rejected;
+                ShowTestResult(result, DateTime.Now);
             };
+        }
+
+        /// <summary>
+        /// Zeigt das Ergebnis unter der Beschriftung: gruen als Bestaetigung, sonst rot. Die Uhrzeit macht sichtbar,
+        /// dass auch ein erneuter Klick wirklich neu getestet hat.
+        /// </summary>
+        void ShowTestResult(InputTestResult result, DateTime time)
+        {
+            string key = result == InputTestResult.Confirmed ? "act.test.ok"
+                : result == InputTestResult.NotCounted ? "act.test.nocount" : "act.test.fail";
+            _testRow.Caption = Loc.T(key, time.ToString("HH:mm:ss", CultureInfo.InvariantCulture));
+            _testRow.CaptionColor = result == InputTestResult.Confirmed ? Theme.GreenButton : Theme.Red;
+            RefreshLayout();
+        }
+
+        /// <summary>Ein frueheres Ergebnis gilt nicht mehr, sobald sich Methode, Taste oder Mausweg aendern: zurueck zum Hinweistext.</summary>
+        void ResetTestResult()
+        {
+            _testRow.Caption = Loc.T("act.test.hint");
+            _testRow.CaptionColor = Theme.Muted;
+            RefreshLayout();
         }
 
         protected override void Populate(Settings s)
@@ -226,11 +225,6 @@ namespace StayGreen.UI
             _maxRunRow.Title = Loc.T("act.maxrun");
             _maxRunRow.Caption = Loc.T("act.maxrun.hint");
             _hoursUnit.Text = Loc.T("act.maxrun.unit");
-
-            _pauseCard.Text = Loc.T("act.grp.pause");
-            _pauseRow.Title = Loc.T("act.pause");
-            _pauseRow.Caption = Loc.T("act.pause.hint");
-            for (int i = 0; i < PauseMinutes.Length; i++) _pauseButtons[i].Text = StatusBuilder.PauseLabel(PauseMinutes[i]);
 
             UpdateIntervalHint();
             RefreshLayout();

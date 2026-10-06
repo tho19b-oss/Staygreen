@@ -33,52 +33,30 @@ namespace StayGreen.Tests
         }
 
         [Fact]
-        public void Active_ShowsCountdownCounterAndRuntime()
+        public void Active_NeedsNoDetails_NoCountdownCounterOrRuntime()
         {
             var s = new Settings { SmartIdle = false, IntervalSeconds = 30 };
             var e = Engine(s, new FakeInput());
             e.Start(T.Mon(10), "x");
             StatusInfo info = StatusBuilder.Build(e, s, T.Mon(10, 0, 10), false);
             Assert.Equal(StatusKind.Active, info.Kind);
-            Assert.Equal("Nächste Aktion in 20 s · 1 Aktion · läuft seit 00:00:10", info.Detail);
-        }
+            Assert.Equal("Aktiv – dein Status bleibt grün", info.Title);
+            Assert.Equal("", info.Detail);
 
-        [Fact]
-        public void Active_CounterUsesPluralFromTwoActions()
-        {
-            var s = new Settings { SmartIdle = false, IntervalSeconds = 30 };
-            var e = Engine(s, new FakeInput());
-            e.Start(T.Mon(10), "x");
+            // Auch nach mehreren Aktionen und langer Laufzeit gibt es nichts, was mitzaehlt oder mitlaeuft.
             e.Tick(T.Mon(10, 0, 30));
-            Assert.Equal("Nächste Aktion in 30 s · 2 Aktionen · läuft seit 00:00:30",
-                StatusBuilder.Build(e, s, T.Mon(10, 0, 30), false).Detail);
+            e.Tick(T.Mon(10, 1, 0));
+            Assert.Equal("", StatusBuilder.Build(e, s, T.Mon(10, 1, 0), false).Detail);
+            Assert.Equal("", StatusBuilder.Build(e, s, T.Mon(12, 0, 0), false).Detail);
 
             Loc.Language = "en";
-            Assert.Equal("Next action in 30 s · 2 actions · running for 00:00:30",
-                StatusBuilder.Build(e, s, T.Mon(10, 0, 30), false).Detail);
-            Assert.Equal("Next action in 20 s · 1 action · running for 00:00:10",
-                StatusBuilder.Build(SingleActionEngine(s), s, T.Mon(10, 0, 10), false).Detail);
-        }
-
-        static HolderEngine SingleActionEngine(Settings s)
-        {
-            var e = Engine(s, new FakeInput());
-            e.Start(T.Mon(10), "x");
-            return e;
+            StatusInfo english = StatusBuilder.Build(e, s, T.Mon(10, 1, 0), false);
+            Assert.Equal("Active – your status stays green", english.Title);
+            Assert.Equal("", english.Detail);
         }
 
         [Fact]
-        public void Active_CountdownRoundsUpAndNeverGoesNegative()
-        {
-            var s = new Settings { SmartIdle = false, IntervalSeconds = 30 };
-            var e = Engine(s, new FakeInput());
-            e.Start(T.Mon(10), "x");
-            Assert.Contains("in 30 s", StatusBuilder.Build(e, s, T.Mon(10).AddMilliseconds(100), false).Detail);
-            Assert.Contains("in 0 s", StatusBuilder.Build(e, s, T.Mon(10, 5, 0), false).Detail);
-        }
-
-        [Fact]
-        public void Smart_WhileUserIsActive_ShowsStandby()
+        public void Smart_WhileUserIsActive_ShowsStandby_WithoutALiveIdleCounter()
         {
             var s = new Settings { SmartIdle = true, IntervalSeconds = 30 };
             var input = new FakeInput { Idle = TimeSpan.FromSeconds(7) };
@@ -86,8 +64,29 @@ namespace StayGreen.Tests
             e.Start(T.Mon(10), "x");
             StatusInfo info = StatusBuilder.Build(e, s, T.Mon(10), false);
             Assert.Equal(StatusKind.StandingBy, info.Kind);
-            Assert.Contains("30 s", info.Detail);
-            Assert.Contains("7 s", info.Detail);
+            Assert.Equal("Greift ein, sobald du 30 s nichts tust.", info.Detail);
+
+            // Der Leerlauf aendert sich von Sekunde zu Sekunde, der Text darf nicht mitticken.
+            input.Idle = TimeSpan.FromSeconds(12);
+            e.Tick(T.Mon(10, 0, 1));
+            Assert.Equal(info.Detail, StatusBuilder.Build(e, s, T.Mon(10, 0, 1), false).Detail);
+
+            Loc.Language = "en";
+            Assert.Equal("Steps in once you are idle for 30 s.", StatusBuilder.Build(e, s, T.Mon(10, 0, 1), false).Detail);
+        }
+
+        [Theory]
+        [InlineData(StatusKind.Active, true)]
+        [InlineData(StatusKind.StandingBy, true)]
+        [InlineData(StatusKind.Stopped, false)]
+        [InlineData(StatusKind.Paused, false)]
+        [InlineData(StatusKind.WaitingForWindow, false)]
+        [InlineData(StatusKind.WaitingForTeams, false)]
+        [InlineData(StatusKind.Blocked, false)]
+        [InlineData(StatusKind.SessionLocked, false)]
+        public void PauseButtons_AreOnlyOfferedWhereAPauseDoesSomething(StatusKind kind, bool offered)
+        {
+            Assert.Equal(offered, StatusBuilder.OffersPause(kind));
         }
 
         [Fact]
