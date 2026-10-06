@@ -43,6 +43,7 @@ namespace StayGreen.UI
 
             _hero.ToggleClicked += () => _app.Toggle(Loc.T("reason.manual"));
             _hero.ResumeClicked += () => _app.ResumeFromPause();
+            _hero.PauseClicked += minutes => _app.PauseFor(minutes, Loc.T("reason.manual"));
             _nav.SelectedIndexChanged += (o, e) => ShowSelectedPage();
 
             _footer.AutoSize = false;

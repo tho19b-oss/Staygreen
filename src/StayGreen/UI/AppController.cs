@@ -181,7 +181,6 @@ namespace StayGreen.UI
         {
             var form = new MainForm(this);
             form.ActivityPage.TestRequested = TestInput;
-            form.ActivityPage.PauseRequested = minutes => PauseFor(minutes, Loc.T("reason.manual"));
             form.SystemPage.DefaultLogPath = () => SettingsStore.DefaultLogPath;
             form.SystemPage.OpenFolderRequested = OpenSettingsFolder;
             form.SystemPage.OpenLogRequested = OpenLogFile;
