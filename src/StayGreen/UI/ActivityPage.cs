@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 using System.Windows.Forms;
 using StayGreen.Core;
 
@@ -39,8 +40,8 @@ namespace StayGreen.UI
         readonly SettingRow _maxRunRow;
         readonly SettingRow _pauseRow;
 
-        /// <summary>Wird vom Hauptfenster gesetzt: erzeugt eine Eingabe und meldet, ob Windows sie angenommen hat.</summary>
-        public Func<bool> TestRequested;
+        /// <summary>Wird vom Hauptfenster gesetzt: erzeugt eine Eingabe und meldet, ob Windows sie angenommen und als Aktivitaet gewertet hat.</summary>
+        public Func<InputTestResult> TestRequested;
 
         /// <summary>Wird vom Hauptfenster gesetzt: pausiert fuer so viele Minuten.</summary>
         public Action<int> PauseRequested;
@@ -96,12 +97,14 @@ namespace StayGreen.UI
                 if (Loading || S == null || _mode.SelectedIndex < 0) return;
                 S.Mode = (ActivityMode)_mode.SelectedIndex;
                 UpdateEnabled();
+                ResetTestResult();
                 Fire();
             };
             _key.SelectedIndexChanged += (o, e) =>
             {
                 if (Loading || S == null || _key.SelectedIndex < 0) return;
                 S.InputKey = (ActivityKey)_key.SelectedIndex;
+                ResetTestResult();
                 Fire();
             };
             _interval.ValueChanged += (o, e) =>
@@ -115,6 +118,7 @@ namespace StayGreen.UI
             {
                 if (Loading || S == null) return;
                 S.MousePixels = (int)_pixels.Value;
+                ResetTestResult();
                 Fire();
             };
             _smart.CheckedChanged += (o, e) =>
@@ -143,11 +147,30 @@ namespace StayGreen.UI
             };
             _test.Click += (o, e) =>
             {
-                bool ok = TestRequested != null && TestRequested();
-                _testRow.Caption = Loc.T(ok ? "act.test.ok" : "act.test.fail");
-                _testRow.CaptionColor = ok ? Theme.GreenButton : Theme.Red;
-                RefreshLayout();
+                InputTestResult result = TestRequested != null ? TestRequested() : InputTestResult.Rejected;
+                ShowTestResult(result, DateTime.Now);
             };
+        }
+
+        /// <summary>
+        /// Zeigt das Ergebnis unter der Beschriftung: gruen als Bestaetigung, sonst rot. Die Uhrzeit macht sichtbar,
+        /// dass auch ein erneuter Klick wirklich neu getestet hat.
+        /// </summary>
+        void ShowTestResult(InputTestResult result, DateTime time)
+        {
+            string key = result == InputTestResult.Confirmed ? "act.test.ok"
+                : result == InputTestResult.NotCounted ? "act.test.nocount" : "act.test.fail";
+            _testRow.Caption = Loc.T(key, time.ToString("HH:mm:ss", CultureInfo.InvariantCulture));
+            _testRow.CaptionColor = result == InputTestResult.Confirmed ? Theme.GreenButton : Theme.Red;
+            RefreshLayout();
+        }
+
+        /// <summary>Ein frueheres Ergebnis gilt nicht mehr, sobald sich Methode, Taste oder Mausweg aendern: zurueck zum Hinweistext.</summary>
+        void ResetTestResult()
+        {
+            _testRow.Caption = Loc.T("act.test.hint");
+            _testRow.CaptionColor = Theme.Muted;
+            RefreshLayout();
         }
 
         protected override void Populate(Settings s)

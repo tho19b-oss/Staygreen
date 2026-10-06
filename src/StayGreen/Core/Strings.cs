@@ -193,10 +193,15 @@ namespace StayGreen.Core
             new[] { "act.test.hint",
                 "Sendet jetzt eine Eingabe und zeigt, ob Windows sie annimmt.",
                 "Sends an input now and shows whether Windows accepts it." },
-            new[] { "act.test.ok", "Eingabe gesendet.", "Input sent." },
+            new[] { "act.test.ok",
+                "Test bestanden ({0}): Windows hat die Eingabe angenommen und als Aktivität gewertet.",
+                "Test passed ({0}): Windows accepted the input and counted it as activity." },
+            new[] { "act.test.nocount",
+                "Test fehlgeschlagen ({0}): Windows hat die Eingabe angenommen, aber nicht als Aktivität gewertet. Teams sieht sie dann womöglich nicht. Probiere eine andere Methode oder Taste.",
+                "Test failed ({0}): Windows accepted the input but did not count it as activity. Teams may not see it. Try another method or key." },
             new[] { "act.test.fail",
-                "Windows hat die Eingabe abgelehnt (PC gesperrt oder Zugriff blockiert).",
-                "Windows rejected the input (PC locked or access blocked)." },
+                "Test fehlgeschlagen ({0}): Windows hat die Eingabe abgelehnt (PC gesperrt oder Zugriff blockiert).",
+                "Test failed ({0}): Windows rejected the input (PC locked or access blocked)." },
 
             // ---- Karte "Zeitplan" ----
             new[] { "sch.grp.title", "Aktive Zeiten", "Active hours" },

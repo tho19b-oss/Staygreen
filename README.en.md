@@ -78,7 +78,7 @@ Teams sets you to "Away" after about five minutes without keyboard or mouse acti
 
 **Does anything arrive at all?** Start `StayGreen.exe --selftest` (e.g. via a shortcut with that addition). StayGreen then checks on your computer whether Windows accepts key presses and mouse movements and resets the idle counter, whether the hotkey fires, whether the command channel works and whether autostart is writable, and shows the result in a window. The test only writes a result file to the temp folder and removes its short-lived test autostart entry again immediately.
 
-**The status still turns to "Away".** On the *Activity* tab click **Test now**. If StayGreen reports success, the input reaches Windows. Then the method **Key and mouse**, a shorter interval (30 s) or switching off smart mode usually helps. If the status card at the top says "Input is being rejected", Windows blocks the input (locked session, disconnected remote session or security software). The **log** shows when that happened.
+**The status still turns to "Away".** On the *Activity* tab click **Test now**. If StayGreen reports "Test passed", Windows accepted the input and reset the idle counter, so it reaches Windows. Then the method **Key and mouse**, a shorter interval (30 s) or switching off smart mode usually helps. If it says "Test failed", Windows either rejects the input or does not count it as activity; try another method or key. If the status card at the top says "Input is being rejected", Windows blocks the input (locked session, disconnected remote session or security software). The **log** shows when that happened.
 
 **Strange characters appear in a terminal or remote session.** On the *Activity* tab set the **key** to "Shift key" or use only the method **Mouse movement**.
 
