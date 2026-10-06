@@ -23,7 +23,7 @@ namespace StayGreen.Core
         /// <summary>Kurze Ueberschrift fuer die Statuskarte.</summary>
         public string Title { get; set; }
 
-        /// <summary>Eine Zeile mit Details (naechste Aktion, Zaehler, ...).</summary>
+        /// <summary>Eine Zeile mit Details; leer, wenn die Ueberschrift genuegt (laeuft einfach, nichts zu erklaeren).</summary>
         public string Detail { get; set; }
     }
 
@@ -80,18 +80,15 @@ namespace StayGreen.Core
             {
                 info.Kind = StatusKind.StandingBy;
                 info.Title = Loc.T("status.standby");
-                info.Detail = Loc.T("status.standby.detail", settings.IntervalSeconds, (int)engine.LastIdle.TotalSeconds);
+                info.Detail = Loc.T("status.standby.detail", settings.IntervalSeconds);
             }
             else
             {
+                // Bewusst ohne Details: Countdown, Aktionszaehler und Laufzeit wuerden jede Sekunde mitticken, ohne etwas zu
+                // entscheiden. Faellt etwas aus, zeigt der Zustand "Eingaben werden abgelehnt" es von selbst.
                 info.Kind = StatusKind.Active;
                 info.Title = Loc.T("status.active");
-                DateTime? nextAt = engine.NextActivityAt;
-                int seconds = nextAt.HasValue ? Math.Max(0, (int)Math.Ceiling((nextAt.Value - now).TotalSeconds)) : 0;
-                string elapsed = Format.Duration(engine.Elapsed(now));
-                info.Detail = engine.ActivityCount == 1
-                    ? Loc.T("status.active.detail.one", seconds, elapsed)
-                    : Loc.T("status.active.detail", seconds, engine.ActivityCount, elapsed);
+                info.Detail = "";
             }
             return info;
         }
@@ -130,6 +127,16 @@ namespace StayGreen.Core
             if (settings.AutoStopTiming == StopTiming.ScheduleEnd)
                 return Loc.T(settings.ScheduleActive ? "plan.autostop.noend" : "plan.autostop.noschedule");
             return Loc.T("plan.autostop.expired");
+        }
+
+        /// <summary>
+        /// Bietet die Statuskarte Pausen-Knoepfe an? Nur dort, wo eine Pause etwas bewirkt: StayGreen haelt gerade aktiv oder
+        /// steht bereit. Wartet es ohnehin (Zeitfenster, Teams), ist die Sitzung gesperrt, werden Eingaben abgelehnt oder ist
+        /// es schon pausiert bzw. gestoppt, waeren die Knoepfe nur Ballast.
+        /// </summary>
+        public static bool OffersPause(StatusKind kind)
+        {
+            return kind == StatusKind.Active || kind == StatusKind.StandingBy;
         }
 
         /// <summary>"15 Minuten", "1 Stunde", "2 Stunden" fuer die Pausen-Auswahl (Tray-Menue und Fenster).</summary>

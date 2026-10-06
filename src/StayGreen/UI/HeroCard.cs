@@ -7,8 +7,8 @@ namespace StayGreen.UI
 {
     /// <summary>
     /// Die grosse Statuskarte oben im Fenster: Lampe, Zustand, Details, Zeitplan-Zeile und der Start/Stopp-Knopf.
-    /// Solange StayGreen laeuft, folgt eine Zeile mit den Pausen-Knoepfen, waehrend einer Pause stattdessen "Fortsetzen"
-    /// neben dem Stopp-Knopf. Der Hintergrund faerbt sich zart passend zum Zustand (gruen, gelb, rot, grau).
+    /// Haelt StayGreen aktiv (oder steht bereit), folgt eine Zeile mit den Pausen-Knoepfen, waehrend einer Pause stattdessen
+    /// "Fortsetzen" neben dem Stopp-Knopf. Der Hintergrund faerbt sich zart passend zum Zustand (gruen, gelb, rot, grau).
     /// </summary>
     sealed class HeroCard : LayoutPanel
     {
@@ -101,6 +101,7 @@ namespace StayGreen.UI
             changed |= SetText(_toggle, Loc.T(running ? "btn.stop" : "btn.start"));
             changed |= SetText(_resume, Loc.T("btn.resume"));
             _toggle.Kind = running ? ButtonKind.Dark : ButtonKind.Primary;
+            _detail.Visible = !string.IsNullOrEmpty(detail);
             _plan.Visible = !string.IsNullOrEmpty(plan);
 
             bool paused = kind == StatusKind.Paused;
@@ -110,8 +111,8 @@ namespace StayGreen.UI
                 changed = true;
             }
 
-            // Pausieren geht nur bei laufendem Aktivhalten und nicht doppelt (wie im Tray-Menue); sonst bleibt die Zeile weg.
-            bool canPause = running && !paused;
+            // Pausen-Knoepfe nur dort, wo eine Pause etwas bewirkt (aktiv oder bereit); sonst bleibt die Zeile weg.
+            bool canPause = StatusBuilder.OffersPause(kind);
             if (_canPause != canPause)
             {
                 _canPause = canPause;
@@ -184,8 +185,8 @@ namespace StayGreen.UI
         }
 
         /// <summary>
-        /// Lampe links, Titel und Knoepfe in einer Zeile, darunter Details, Zeitplan und (beim Laufen) die Pausen-Zeile.
-        /// Liefert die Gesamthoehe.
+        /// Lampe links, Titel und Knoepfe in einer Zeile, darunter (nur wenn vorhanden) Details und Zeitplan, zuletzt
+        /// (beim Laufen) die Pausen-Zeile. Liefert die Gesamthoehe.
         /// </summary>
         int Arrange(int width, bool apply)
         {
@@ -200,8 +201,14 @@ namespace StayGreen.UI
             int titleWidth = Math.Max(Dpi.Px(100), width - pad - buttons - gap - textLeft);
             int fullWidth = Math.Max(Dpi.Px(100), width - pad - textLeft);
 
+            bool hasDetail = !string.IsNullOrEmpty(_detail.Text);
+            bool hasPlan = !string.IsNullOrEmpty(_plan.Text);
+
             int titleHeight = _title.MeasureHeight(titleWidth);
             int rowHeight = Math.Max(titleHeight, button.Height);
+
+            // Steht unter dem Titel kein weiterer Text, sitzt er allein neben der Lampe: auf deren Hoehe zentrieren.
+            if (!hasDetail && !hasPlan) rowHeight = Math.Max(rowHeight, lamp);
             int y = pad;
 
             if (apply)
@@ -212,13 +219,17 @@ namespace StayGreen.UI
                     _resume.Location = new Point(_toggle.Left - Dpi.Px(8) - resume.Width, pad + (rowHeight - resume.Height) / 2);
                 _title.SetBounds(textLeft, pad + (rowHeight - titleHeight) / 2, titleWidth, titleHeight);
             }
-            y += rowHeight + Dpi.Px(2);
+            y += rowHeight;
 
-            int detailHeight = _detail.MeasureHeight(fullWidth);
-            if (apply) _detail.SetBounds(textLeft, y, fullWidth, detailHeight);
-            y += detailHeight;
+            if (hasDetail)
+            {
+                y += Dpi.Px(2);
+                int detailHeight = _detail.MeasureHeight(fullWidth);
+                if (apply) _detail.SetBounds(textLeft, y, fullWidth, detailHeight);
+                y += detailHeight;
+            }
 
-            if (!string.IsNullOrEmpty(_plan.Text))
+            if (hasPlan)
             {
                 y += Dpi.Px(2);
                 int planHeight = _plan.MeasureHeight(fullWidth);
@@ -226,10 +237,13 @@ namespace StayGreen.UI
                 y += planHeight;
             }
 
+            // Alles darunter beginnt erst unterhalb der Lampe.
+            y = Math.Max(y, pad + lamp);
+
             // Die Pausen-Zeile beginnt am linken Kartenrand (unter der Lampe), damit sie die ganze Breite nutzen kann.
             if (_canPause) y = ArrangePauseRow(pad, width - pad, y + Dpi.Px(10), apply);
 
-            return Math.Max(pad + lamp, y) + pad;
+            return y + pad;
         }
 
         /// <summary>
