@@ -26,12 +26,12 @@ namespace StayGreen.UI
         readonly WrapLabel _keyHint = CreateEditorHint();
 
         readonly EditableRow _intervalRow = new EditableRow(EditorKind.Input);
-        readonly NumericUpDown _interval = Style(new NumericUpDown { Minimum = Settings.MinInterval, Maximum = Settings.MaxInterval });
+        readonly NumberBox _interval = new NumberBox(Settings.MinInterval, Settings.MaxInterval);
         readonly Label _secondsUnit = CreateEditorLabel();
         readonly WrapLabel _intervalHint = CreateEditorHint();
 
         readonly EditableRow _pixelsRow = new EditableRow(EditorKind.Input);
-        readonly NumericUpDown _pixels = Style(new NumericUpDown { Minimum = Settings.MinMousePixels, Maximum = Settings.MaxMousePixels });
+        readonly NumberBox _pixels = new NumberBox(Settings.MinMousePixels, Settings.MaxMousePixels);
         readonly Label _pixelsUnit = CreateEditorLabel();
         readonly WrapLabel _pixelsHint = CreateEditorHint();
 
@@ -53,9 +53,6 @@ namespace StayGreen.UI
 
         public ActivityPage()
         {
-            _interval.Width = Dpi.Px(76);
-            _pixels.Width = Dpi.Px(76);
-
             // Kopf ohne Schalter: Titel und ein Satz, der erklaert, worum es geht.
             _methodCard.Text = "";
             _methodCard.AddRow(_methodHeader);
@@ -100,15 +97,15 @@ namespace StayGreen.UI
 
             _intervalRow.Opening += () =>
             {
-                if (S != null) _interval.Value = Clamp(S.IntervalSeconds, Settings.MinInterval, Settings.MaxInterval);
+                if (S != null) _interval.Value = S.IntervalSeconds;
                 UpdateIntervalHint();
             };
-            _interval.TextChanged += (o, e) => UpdateIntervalHint();   // schon beim Tippen, nicht erst beim Verlassen
+            _interval.ValueChanged += (o, e) => UpdateIntervalHint();   // schon beim Tippen, nicht erst beim Verlassen
             _intervalRow.SaveRequested += SaveInterval;
 
             _pixelsRow.Opening += () =>
             {
-                if (S != null) _pixels.Value = Clamp(S.MousePixels, Settings.MinMousePixels, Settings.MaxMousePixels);
+                if (S != null) _pixels.Value = S.MousePixels;
             };
             _pixelsRow.SaveRequested += SavePixels;
 
@@ -192,11 +189,6 @@ namespace StayGreen.UI
             return value.ToString(CultureInfo.InvariantCulture);
         }
 
-        static decimal Clamp(int value, int min, int max)
-        {
-            return Math.Min(Math.Max(value, min), max);
-        }
-
         void PickMode()
         {
             if (S == null || _mode.SelectedIndex < 0) return;
@@ -226,7 +218,7 @@ namespace StayGreen.UI
         void SaveInterval()
         {
             if (S == null) return;
-            S.IntervalSeconds = (int)_interval.Value;
+            S.IntervalSeconds = _interval.Value;
             _intervalRow.Close();
             ShowValues();
             Fire();
@@ -235,7 +227,7 @@ namespace StayGreen.UI
         void SavePixels()
         {
             if (S == null) return;
-            S.MousePixels = (int)_pixels.Value;
+            S.MousePixels = _pixels.Value;
             _pixelsRow.Close();
             ShowValues();
             ResetTestResult();
@@ -245,9 +237,8 @@ namespace StayGreen.UI
         /// <summary>Teams wird nach etwa 5 Minuten abwesend: Ab 4 Minuten Abstand warnt der Hinweis im Editor in Rot.</summary>
         void UpdateIntervalHint()
         {
-            // Den getippten Text lesen, nicht Value: Value wuerde eine halbe Eingabe schon pruefen und zurechtruecken.
-            int seconds;
-            if (!int.TryParse(_interval.Text, NumberStyles.Integer, CultureInfo.CurrentCulture, out seconds)) seconds = 0;
+            // Value gilt schon beim Tippen (in die Grenzen gerueckt), der Hinweis folgt also jeder Ziffer.
+            int seconds = _interval.Value;
             bool risky = Settings.IsIntervalRisky(seconds);
             _intervalHint.Text = risky ? Loc.T("act.interval.warn", seconds) : Loc.T("act.hint");
             _intervalHint.ForeColor = risky ? Theme.DangerText : Theme.MutedStrong;

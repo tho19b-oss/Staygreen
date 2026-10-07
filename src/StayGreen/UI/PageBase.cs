@@ -119,16 +119,6 @@ namespace StayGreen.UI
             return control;
         }
 
-        /// <summary>Datumsfeld im kurzen Datumsformat der Windows-Regionseinstellungen.</summary>
-        protected static DateTimePicker CreateDatePicker()
-        {
-            return Style(new DateTimePicker
-            {
-                Format = DateTimePickerFormat.Short,
-                Width = Dpi.Px(118),
-            });
-        }
-
         /// <summary>Voller Wochentagsname in der Sprache der Oberflaeche (Index 0 = Montag), z. B. fuer Screenreader.</summary>
         protected static string DayName(int index)
         {
