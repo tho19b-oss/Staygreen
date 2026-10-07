@@ -338,7 +338,7 @@ namespace StayGreen.UI
         }
 
         /// <summary>
-        /// Faerbt ein Standard-Eingabefeld (Zahl, Auswahl, Text, Datum) passend zum dunklen Design. Hell und Kontrastdesign
+        /// Faerbt ein Standard-Eingabefeld (Auswahl, Text, Datum) passend zum dunklen Design. Hell und Kontrastdesign
         /// uebernimmt Windows selbst.
         /// </summary>
         public static void StyleInput(Control control)

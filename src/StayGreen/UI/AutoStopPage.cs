@@ -44,10 +44,10 @@ namespace StayGreen.UI
 
         readonly EditableRow _warningRow = new EditableRow(EditorKind.Input);
         readonly Label _warnLabel = CreateEditorLabel();
-        readonly NumericUpDown _warn = Style(new NumericUpDown { Minimum = Settings.MinWarnSeconds, Maximum = Settings.MaxWarnSeconds });
+        readonly NumberBox _warn = new NumberBox(Settings.MinWarnSeconds, Settings.MaxWarnSeconds);
         readonly Label _warnUnit = CreateEditorLabel();
         readonly Label _snoozeLabel = CreateEditorLabel();
-        readonly NumericUpDown _snooze = Style(new NumericUpDown { Minimum = Settings.MinSnoozeMinutes, Maximum = Settings.MaxSnoozeMinutes });
+        readonly NumberBox _snooze = new NumberBox(Settings.MinSnoozeMinutes, Settings.MaxSnoozeMinutes);
         readonly Label _snoozeUnit = CreateEditorLabel();
         readonly WrapLabel _warnHint = CreateEditorHint();
 
@@ -57,9 +57,6 @@ namespace StayGreen.UI
 
         public AutoStopPage()
         {
-            _warn.Width = Dpi.Px(76);
-            _snooze.Width = Dpi.Px(76);
-
             // Kopf der Karte: Titel, Erklaerung und Schalter in einer Zeile (wie "Aktive Zeiten").
             _card.Text = "";
             _header = CreateHeader(_enable);
@@ -293,15 +290,15 @@ namespace StayGreen.UI
         void FillWarning()
         {
             if (S == null) return;
-            _warn.Value = Math.Min(Math.Max(S.AutoStopWarnSeconds, Settings.MinWarnSeconds), Settings.MaxWarnSeconds);
-            _snooze.Value = Math.Min(Math.Max(S.AutoStopSnoozeMinutes, Settings.MinSnoozeMinutes), Settings.MaxSnoozeMinutes);
+            _warn.Value = S.AutoStopWarnSeconds;
+            _snooze.Value = S.AutoStopSnoozeMinutes;
         }
 
         void SaveWarning()
         {
             if (S == null) return;
-            S.AutoStopWarnSeconds = (int)_warn.Value;
-            S.AutoStopSnoozeMinutes = (int)_snooze.Value;
+            S.AutoStopWarnSeconds = _warn.Value;
+            S.AutoStopSnoozeMinutes = _snooze.Value;
             _warningRow.Close();
             ShowValues();
             Fire();

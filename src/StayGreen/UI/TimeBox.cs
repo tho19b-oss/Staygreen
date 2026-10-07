@@ -10,58 +10,25 @@ namespace StayGreen.UI
     /// <summary>
     /// Uhrzeitfeld "HH:mm" (24 Stunden) im Stil der Karten. Ersetzt das Windows-Uhrzeitfeld, das sich im dunklen Design
     /// nicht einfaerben laesst. Stunden und Minuten sind zwei Teile: Ziffern tippen, Pfeil hoch/runter oder die kleinen
-    /// Pfeile rechts aendern den gewaehlten Teil, Pfeil links/rechts (oder ":") wechselt ihn. Das Mausrad aendert den Wert
-    /// nur, solange das Feld den Fokus hat; sonst rollt wie gewohnt die Seite.
+    /// Pfeile rechts aendern den gewaehlten Teil, Pfeil links/rechts (oder ":") wechselt ihn. Rahmen, Pfeile und Mausrad
+    /// kommen von <see cref="SpinField"/>.
     /// </summary>
-    sealed class TimeBox : Control
+    sealed class TimeBox : SpinField
     {
         const int HourPart = 0;
         const int MinutePart = 1;
 
-        const TextFormatFlags TextFlags = TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine
-            | TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix | TextFormatFlags.PreserveGraphicsClipping;
-
-        readonly Timer _repeat = new Timer();
         int _hours;
         int _minutes;
         int _part = HourPart;
         int _pending = -1;     // erste Ziffer einer zweistelligen Eingabe, -1 = keine
-        int _hoverArrow;       // +1 = oberer Pfeil, -1 = unterer, 0 = keiner
-        int _pressedArrow;
-        bool _compact;
 
         public TimeBox()
         {
-            SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer
-                     | ControlStyles.ResizeRedraw | ControlStyles.Selectable, true);
-            TabStop = true;
-            AccessibleRole = AccessibleRole.SpinButton;
-
-            // Gedrueckt gehaltener Pfeil: nach einer kurzen Pause schnell weiterzaehlen (wie beim Windows-Feld).
-            _repeat.Tick += (o, e) =>
-            {
-                _repeat.Interval = 70;
-                Step(_pressedArrow);
-            };
             Fit();
         }
 
         public event EventHandler ValueChanged;
-
-        /// <summary>
-        /// Flach wie die Windows-Eingabefelder, z. B. neben einem Datums- oder Zahlenfeld; sonst so hoch wie die runden
-        /// Wochentag-Knoepfe im Zeitplan.
-        /// </summary>
-        public bool Compact
-        {
-            get { return _compact; }
-            set
-            {
-                if (_compact == value) return;
-                _compact = value;
-                Fit();
-            }
-        }
 
         /// <summary>Die Uhrzeit; nur Stunden und Minuten zaehlen (Sekunden und ganze Tage fallen weg).</summary>
         public TimeSpan Value
@@ -95,7 +62,7 @@ namespace StayGreen.UI
         }
 
         /// <summary>Gewaehlten Teil um <paramref name="delta"/> weiterdrehen (23 -> 00, 59 -> 00, ohne Uebertrag).</summary>
-        void Step(int delta)
+        protected override void Step(int delta)
         {
             if (delta == 0) return;
             _pending = -1;
@@ -145,20 +112,6 @@ namespace StayGreen.UI
 
         // ------------------------------------------------------------------ Tastatur und Maus
 
-        protected override bool IsInputKey(Keys keyData)
-        {
-            switch (keyData)
-            {
-                case Keys.Up:
-                case Keys.Down:
-                case Keys.Left:
-                case Keys.Right:
-                    return true;
-                default:
-                    return base.IsInputKey(keyData);
-            }
-        }
-
         protected override void OnKeyDown(KeyEventArgs e)
         {
             base.OnKeyDown(e);
@@ -200,112 +153,31 @@ namespace StayGreen.UI
             }
         }
 
-        protected override void OnMouseDown(MouseEventArgs e)
+        /// <summary>Ein Klick waehlt den Teil, auf den er trifft.</summary>
+        protected override void OnContentClick(Point location)
         {
-            base.OnMouseDown(e);
-            if (e.Button != MouseButtons.Left) return;
-            Focus();
-
-            int arrow = ArrowAt(e.Location);
-            if (arrow != 0)
-            {
-                _pressedArrow = arrow;
-                Step(arrow);
-                _repeat.Interval = 400;
-                _repeat.Start();
-            }
-            else
-            {
-                Rectangle hours, minutes;
-                GetParts(out hours, out minutes);
-                SelectPart(e.X < (hours.Right + minutes.Left) / 2 ? HourPart : MinutePart);
-            }
-            Invalidate();
-        }
-
-        protected override void OnMouseUp(MouseEventArgs e)
-        {
-            base.OnMouseUp(e);
-            StopRepeat();
-        }
-
-        protected override void OnMouseCaptureChanged(EventArgs e)
-        {
-            base.OnMouseCaptureChanged(e);
-            StopRepeat();
-        }
-
-        protected override void OnMouseMove(MouseEventArgs e)
-        {
-            base.OnMouseMove(e);
-            int hover = ArrowAt(e.Location);
-            if (hover == _hoverArrow) return;
-            _hoverArrow = hover;
-            Invalidate();
-        }
-
-        protected override void OnMouseLeave(EventArgs e)
-        {
-            base.OnMouseLeave(e);
-            _hoverArrow = 0;
-            Invalidate();
-        }
-
-        /// <summary>
-        /// Das Rad dreht den Wert nur, wenn das Feld den Fokus hat und der Zeiger darueber steht; sonst reicht Windows es an
-        /// die Seite weiter, die dann rollt.
-        /// </summary>
-        protected override void OnMouseWheel(MouseEventArgs e)
-        {
-            base.OnMouseWheel(e);
-            if (!Focused || e.Delta == 0 || !ClientRectangle.Contains(e.Location)) return;
-            Step(e.Delta > 0 ? 1 : -1);
-            var handled = e as HandledMouseEventArgs;
-            if (handled != null) handled.Handled = true;
-        }
-
-        void StopRepeat()
-        {
-            _repeat.Stop();
-            if (_pressedArrow == 0) return;
-            _pressedArrow = 0;
-            Invalidate();
+            Rectangle hours, minutes;
+            GetParts(out hours, out minutes);
+            SelectPart(location.X < (hours.Right + minutes.Left) / 2 ? HourPart : MinutePart);
         }
 
         protected override void OnGotFocus(EventArgs e)
         {
             base.OnGotFocus(e);
             _pending = -1;
-            Invalidate();
         }
 
         protected override void OnLostFocus(EventArgs e)
         {
             base.OnLostFocus(e);
             _pending = -1;
-            StopRepeat();
-            Invalidate();
-        }
-
-        protected override void OnEnabledChanged(EventArgs e)
-        {
-            base.OnEnabledChanged(e);
-            Invalidate();
         }
 
         // ------------------------------------------------------------------ Groesse und Zeichnen
 
-        void Fit()
+        protected override int ContentWidth
         {
-            int text = Metrics.TextWidth("00:00", Font);
-            int height = _compact ? Math.Max(Dpi.Px(23), Font.Height + Dpi.Px(8)) : Math.Max(Dpi.Px(32), Font.Height + Dpi.Px(12));
-            Size = new Size(Math.Max(Dpi.Px(84), text + Dpi.Px(48)), height);
-        }
-
-        protected override void OnFontChanged(EventArgs e)
-        {
-            base.OnFontChanged(e);
-            Fit();
+            get { return Metrics.TextWidth("00:00", Font); }
         }
 
         /// <summary>
@@ -317,99 +189,43 @@ namespace StayGreen.UI
             int digits = Metrics.TextWidth("0000", Font);
             int pair = digits / 2;
             int colon = Math.Max(1, Metrics.TextWidth("00:00", Font) - digits);
-            int left = Dpi.Px(10);
+            int left = TextLeft;
             hours = new Rectangle(left, 0, pair, Height);
             minutes = new Rectangle(left + pair + colon, 0, pair, Height);
         }
 
-        Rectangle ArrowBounds
+        protected override void PaintContent(Graphics g, Color fore)
         {
-            get
-            {
-                int width = Dpi.Px(22);
-                return new Rectangle(Width - width - Dpi.Px(1), Dpi.Px(1), width, Height - Dpi.Px(2));
-            }
-        }
-
-        /// <summary>+1 ueber dem oberen Pfeil, -1 ueber dem unteren, sonst 0.</summary>
-        int ArrowAt(Point point)
-        {
-            Rectangle arrows = ArrowBounds;
-            if (!arrows.Contains(point)) return 0;
-            return point.Y < arrows.Top + arrows.Height / 2 ? 1 : -1;
-        }
-
-        protected override void OnPaint(PaintEventArgs e)
-        {
-            Graphics g = e.Graphics;
-            Draw.Background(g, this);
-
-            bool enabled = Enabled;
-            bool focused = Focused;
-            Color border = enabled && focused ? Theme.Green : Theme.FieldBorder;
-            Metrics.PaintRounded(g, ClientRectangle, Dpi.Px(6), enabled ? Theme.InputBack : Theme.Track, border);
-
             // Die Uhrzeit in einem Zug zeichnen, damit Ziffern und Doppelpunkt so dicht stehen wie in normalem Text.
             Rectangle hours, minutes;
             GetParts(out hours, out minutes);
             string text = _hours.ToString("00", CultureInfo.InvariantCulture) + ":"
                 + _minutes.ToString("00", CultureInfo.InvariantCulture);
             var bounds = new Rectangle(hours.Left, 0, minutes.Right - hours.Left + Dpi.Px(6), Height);
-            Color fore = enabled ? Theme.Text : Theme.Disabled;
-            if (focused)
-            {
-                // Der gewaehlte Teil gruen hinterlegt und weiss: derselbe Text zweimal, jeweils passend beschnitten. Zum
-                // Doppelpunkt hin bleibt die Markierung schmal, damit sie ihn nicht anschneidet.
-                Rectangle part = _part == HourPart ? hours : minutes;
-                int outer = Dpi.Px(2);
-                int inner = Dpi.Px(1);
-                int height = Font.Height + Dpi.Px(2);
-                int markLeft = part.X - (_part == HourPart ? outer : inner);
-                var mark = new Rectangle(markLeft, (Height - height) / 2, part.Width + outer + inner, height);
-                Metrics.PaintRounded(g, mark, Dpi.Px(3), Theme.GreenButton, Color.Empty);
-                using (var outside = new Region(ClientRectangle))
-                {
-                    outside.Exclude(mark);
-                    g.SetClip(outside, CombineMode.Replace);
-                    TextRenderer.DrawText(g, text, Font, bounds, fore, TextFlags);
-                }
-                g.SetClip(mark);
-                TextRenderer.DrawText(g, text, Font, bounds, Theme.OnAccent, TextFlags);
-                g.ResetClip();
-            }
-            else
+            if (!Focused)
             {
                 TextRenderer.DrawText(g, text, Font, bounds, fore, TextFlags);
+                return;
             }
 
-            Rectangle arrows = ArrowBounds;
-            int middle = arrows.Top + arrows.Height / 2;
-            int center = arrows.Left + arrows.Width / 2;
-            DrawArrow(g, center, middle - Dpi.Px(4), true, ArrowColor(1));
-            DrawArrow(g, center, middle + Dpi.Px(4), false, ArrowColor(-1));
-        }
-
-        Color ArrowColor(int arrow)
-        {
-            if (!Enabled) return Theme.Disabled;
-            if (_pressedArrow == arrow) return Theme.Green;
-            return _hoverArrow == arrow ? Theme.Text : Theme.Muted;
-        }
-
-        static void DrawArrow(Graphics g, int x, int y, bool up, Color color)
-        {
-            float half = 3.5f * Dpi.Factor;
-            float rise = 2f * Dpi.Factor;
-            float tip = up ? y - rise : y + rise;
-            float foot = up ? y + rise : y - rise;
-            g.SmoothingMode = SmoothingMode.AntiAlias;
-            using (var pen = new Pen(color, Math.Max(1.2f, 1.4f * Dpi.Factor)))
+            // Der gewaehlte Teil gruen hinterlegt und weiss: derselbe Text zweimal, jeweils passend beschnitten. Zum
+            // Doppelpunkt hin bleibt die Markierung schmal, damit sie ihn nicht anschneidet.
+            Rectangle part = _part == HourPart ? hours : minutes;
+            int outer = Dpi.Px(2);
+            int inner = Dpi.Px(1);
+            int height = Font.Height + Dpi.Px(2);
+            int markLeft = part.X - (_part == HourPart ? outer : inner);
+            var mark = new Rectangle(markLeft, (Height - height) / 2, part.Width + outer + inner, height);
+            Metrics.PaintRounded(g, mark, Dpi.Px(3), Theme.GreenButton, Color.Empty);
+            using (var outside = new Region(ClientRectangle))
             {
-                pen.StartCap = LineCap.Round;
-                pen.EndCap = LineCap.Round;
-                pen.LineJoin = LineJoin.Round;
-                g.DrawLines(pen, new[] { new PointF(x - half, foot), new PointF(x, tip), new PointF(x + half, foot) });
+                outside.Exclude(mark);
+                g.SetClip(outside, CombineMode.Replace);
+                TextRenderer.DrawText(g, text, Font, bounds, fore, TextFlags);
             }
+            g.SetClip(mark);
+            TextRenderer.DrawText(g, text, Font, bounds, Theme.OnAccent, TextFlags);
+            g.ResetClip();
         }
 
         // ------------------------------------------------------------------ Screenreader
@@ -439,12 +255,6 @@ namespace StayGreen.UI
                     if (ScheduleRule.TryParseTime(value, out time)) _owner.Value = time;
                 }
             }
-        }
-
-        protected override void Dispose(bool disposing)
-        {
-            if (disposing) _repeat.Dispose();
-            base.Dispose(disposing);
         }
     }
 }

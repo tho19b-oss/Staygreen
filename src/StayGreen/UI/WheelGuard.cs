@@ -5,10 +5,10 @@ namespace StayGreen.UI
 {
     /// <summary>
     /// Verhindert, dass das Mausrad beim Scrollen versehentlich Einstellungen aendert. Windows reicht das Rad an das Feld
-    /// unter dem Mauszeiger, und ein Auswahl-, Zahlen- oder Datumsfeld wuerde dann seinen Wert wechseln, statt die Seite
-    /// weiterzurollen (Sprache und Intervall waeren so schnell verstellt). Hier scrollt bei einem Feld ohne Fokus die
-    /// Seite; ein Feld, in das man geklickt hat, reagiert wie gewohnt auf das Rad. Eine geoeffnete Auswahlliste rollt
-    /// ebenfalls selbst.
+    /// unter dem Mauszeiger, und ein Auswahl- oder Datumsfeld von Windows wuerde dann seinen Wert wechseln, statt die Seite
+    /// weiterzurollen. Hier scrollt bei einem Feld ohne Fokus die Seite; ein Feld, in das man geklickt hat, reagiert wie
+    /// gewohnt auf das Rad. Eine geoeffnete Auswahlliste rollt ebenfalls selbst. Die eigenen Uhrzeit- und Zahlenfelder
+    /// (<see cref="SpinField"/>) halten es von sich aus so.
     /// </summary>
     sealed class WheelGuard : IMessageFilter
     {
@@ -40,12 +40,12 @@ namespace StayGreen.UI
             }
         }
 
-        /// <summary>Das Eingabefeld, zu dem das Fenster gehoert (die Teile eines Zahlenfelds haben es als Eltern), sonst null.</summary>
+        /// <summary>Das Eingabefeld, zu dem das Fenster gehoert, sonst null.</summary>
         static Control InputFieldOf(Control control)
         {
             for (Control c = control; c != null; c = c.Parent)
             {
-                if (c is ComboBox || c is NumericUpDown || c is DateTimePicker) return c;
+                if (c is ComboBox || c is DateTimePicker) return c;
                 if (c is ScrollHost) return null;
             }
             return null;

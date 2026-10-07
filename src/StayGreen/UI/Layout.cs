@@ -336,7 +336,7 @@ namespace StayGreen.UI
                 return;
             }
 
-            if (accessory is SwitchBox || accessory is ComboBox || accessory is NumericUpDown
+            if (accessory is SwitchBox || accessory is ComboBox || accessory is NumberBox
                 || accessory is DateTimePicker || accessory is TimeBox || accessory is TextBox || accessory is Segmented)
                 accessory.AccessibleName = name;
         }
