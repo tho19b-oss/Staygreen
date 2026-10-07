@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Globalization;
 using System.Windows.Forms;
@@ -13,6 +14,7 @@ namespace StayGreen.UI
     /// </summary>
     abstract class PageBase : Stack
     {
+        readonly List<EditableRow> _editables = new List<EditableRow>();
         bool _loading;
 
         protected PageBase()
@@ -47,7 +49,23 @@ namespace StayGreen.UI
         public void LoadSettings(Settings settings)
         {
             S = settings;
+            CloseEditors(null);   // neu geladene Einstellungen: ein offener Entwurf passt nicht mehr dazu
             Quiet(() => Populate(settings));
+        }
+
+        /// <summary>Meldet eine aufklappbare Zeile an. Von allen angemeldeten Zeilen der Seite ist hoechstens ein Editor offen.</summary>
+        protected EditableRow Track(EditableRow row)
+        {
+            _editables.Add(row);
+            row.Opened += () => CloseEditors(row);
+            return row;
+        }
+
+        /// <summary>Klappt alle Editoren der Seite zu, ausser <paramref name="keep"/>.</summary>
+        protected void CloseEditors(EditableRow keep)
+        {
+            foreach (EditableRow row in _editables)
+                if (row != keep) row.Close();
         }
 
         protected abstract void Populate(Settings settings);
@@ -126,6 +144,24 @@ namespace StayGreen.UI
         protected static WrapLabel CreateHint()
         {
             return new WrapLabel { ForeColor = Theme.Muted };
+        }
+
+        /// <summary>Hinweis im aufgeklappten Editor: etwas kraeftiger als <see cref="CreateHint"/>, damit er auf der Toenung gut lesbar bleibt.</summary>
+        protected static WrapLabel CreateEditorHint()
+        {
+            return new WrapLabel { ForeColor = Theme.MutedStrong };
+        }
+
+        /// <summary>Beschriftung im Editor (Einheit, "von"/"bis" ...), ebenfalls kraeftiger fuer die Toenung.</summary>
+        protected static Label CreateEditorLabel()
+        {
+            return new Label { AutoSize = true, UseMnemonic = false, ForeColor = Theme.MutedStrong };
+        }
+
+        /// <summary>Kopf einer Karte: Titel, ein Satz Erklaerung und (optional) rechts der Schalter fuer die ganze Karte.</summary>
+        protected static SettingRow CreateHeader(SwitchBox toggle)
+        {
+            return new SettingRow(toggle) { Heading = true, Inset = new Padding(0, 0, 0, 12) };
         }
 
         protected static FlatButton CreateButton(ButtonKind kind)

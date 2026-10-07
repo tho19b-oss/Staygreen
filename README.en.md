@@ -33,7 +33,7 @@ Scoop also puts the command `StayGreen` on your path, so `StayGreen --toggle` or
   <img src="docs/images/en-2-schedule.png" width="330" alt="StayGreen, Schedule tab (waiting for the time window)">
 </p>
 
-*Captured on Windows 11. The status card at the top shows the state and changes its tint accordingly: green = active, amber = waiting (for the time window or for Teams) or paused, red = input is being rejected, grey = stopped. There is also a dark appearance, see the [German screenshots](README.md#so-sieht-es-aus).*
+*Captured on Windows 11. The status card at the top shows the state and changes its tint accordingly: green = active, amber = waiting (for the time window or for Teams) or paused, red = input is being rejected, grey = stopped. There is also a dark appearance, see the [German screenshots](README.md#so-sieht-es-aus). Settings are shown as compact rows with their value; a click opens the row for editing right where it is. A choice (method, key, language, appearance) applies at once, numbers and times are applied with "Save".*
 
 ## Features
 
@@ -76,7 +76,7 @@ Teams sets you to "Away" after about five minutes without keyboard or mouse acti
 
 **Does anything arrive at all?** Start `StayGreen.exe --selftest` (e.g. via a shortcut with that addition). StayGreen then checks on your computer whether Windows accepts key presses and mouse movements and resets the idle counter, whether the hotkey fires, whether the command channel works and whether autostart is writable, and shows the result in a window. The test only writes a result file to the temp folder and removes its short-lived test autostart entry again immediately.
 
-**The status still turns to "Away".** On the *Activity* tab click **Test now**. If StayGreen reports "Test passed", Windows accepted the input and reset the idle counter, so it reaches Windows. Then the method **Key and mouse**, a shorter interval (30 s) or switching off smart mode usually helps. If it says "Test failed", Windows either rejects the input or does not count it as activity; try another method or key. If the status card at the top says "Input is being rejected", Windows blocks the input (locked session, disconnected remote session or security software). The **log** shows when that happened.
+**The status still turns to "Away".** On the *Activity* tab click **Test input**. If StayGreen reports "Test passed", Windows accepted the input and reset the idle counter, so it reaches Windows. Then the method **Key and mouse**, a shorter interval (30 s) or switching off smart mode usually helps. If it says "Test failed", Windows either rejects the input or does not count it as activity; try another method or key. If the status card at the top says "Input is being rejected", Windows blocks the input (locked session, disconnected remote session or security software). The **log** shows when that happened.
 
 **Strange characters appear in a terminal or remote session.** On the *Activity* tab set the **key** to "Shift key" or use only the method **Mouse movement**.
 
@@ -86,7 +86,7 @@ Teams sets you to "Away" after about five minutes without keyboard or mouse acti
 
 **Settings or log are not saved.** If StayGreen cannot write a file (read-only folder, invalid path), a notice appears once, and on the *System* tab the reason is shown in red at the affected setting.
 
-**An error in the program.** Errors that StayGreen catches so that holding keeps running end up in `error.log` in the settings folder (*System* tab → *Settings folder* → Open). The same message is only counted, not written out every time; the file stays under 256 KB. Attaching it to a bug report helps a lot.
+**An error in the program.** Errors that StayGreen catches so that holding keeps running end up in `error.log` in the settings folder (*System* tab → **Open settings folder**). The same message is only counted, not written out every time; the file stays under 256 KB. Attaching it to a bug report helps a lot.
 
 **Reset everything.** Exit StayGreen and delete the folder `%APPDATA%\StayGreen`. Switch autostart off on the *System* tab beforehand (this removes the entry under `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`). StayGreen leaves nothing else behind.
 

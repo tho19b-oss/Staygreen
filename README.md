@@ -41,7 +41,7 @@ Scoop legt außerdem den Befehl `StayGreen` in den Pfad. Damit gehen `StayGreen 
   <img src="docs/images/de-6-dunkel.png" width="330" alt="StayGreen im dunklen Design">
 </p>
 
-*Aufnahmen auf Windows 11. Die Statuskarte oben zeigt den Zustand an und färbt sich passend ein: grün = aktiv, gelb = wartet (auf das Zeitfenster oder auf Teams) oder pausiert, rot = Eingaben werden abgelehnt, grau = gestoppt.*
+*Aufnahmen auf Windows 11. Die Statuskarte oben zeigt den Zustand an und färbt sich passend ein: grün = aktiv, gelb = wartet (auf das Zeitfenster oder auf Teams) oder pausiert, rot = Eingaben werden abgelehnt, grau = gestoppt. Einstellungen stehen als kompakte Zeilen mit ihrem Wert; ein Klick klappt die Zeile an Ort und Stelle zum Bearbeiten auf. Eine Auswahl (Methode, Taste, Sprache, Darstellung) gilt sofort, Zahlen und Zeiten übernimmt „Speichern“.*
 
 ## Funktionen
 
@@ -86,7 +86,7 @@ Teams setzt dich nach etwa fünf Minuten ohne Tastatur- und Mausaktivität auf �
 `StayGreen.exe --selftest` starten (z. B. über eine Verknüpfung mit diesem Zusatz). StayGreen prüft dann auf deinem Rechner, ob Windows Tastendruck und Mausbewegung annimmt und den Leerlaufzähler zurücksetzt, ob der Hotkey auslöst, ob der Befehlskanal funktioniert und ob der Autostart schreibbar ist, und zeigt das Ergebnis in einem Fenster. Der Test schreibt nur eine Ergebnisdatei in den Temp-Ordner und entfernt seinen kurzzeitigen Test-Eintrag im Autostart sofort wieder.
 
 **Der Status wird trotzdem „Abwesend“.**
-Im Reiter *Aktivität* auf **Jetzt testen** klicken. Meldet StayGreen „Test bestanden“, hat Windows die Eingabe angenommen und den Leerlaufzähler zurückgesetzt, sie kommt also an. Dann hilft meist die Methode **Taste und Maus**, ein kürzeres Intervall (30 s) oder das Abschalten des intelligenten Modus. Heißt es „Test fehlgeschlagen“, lehnt Windows die Eingabe ab oder wertet sie nicht als Aktivität; dann hilft eine andere Methode oder Taste. Zeigt die Statuskarte oben „Eingaben werden abgelehnt“, blockiert Windows die Eingabe (gesperrte Sitzung, getrennte Remote-Sitzung oder Sicherheitssoftware). Das **Protokoll** zeigt, wann das passiert ist.
+Im Reiter *Aktivität* auf **Eingabe testen** klicken. Meldet StayGreen „Test bestanden“, hat Windows die Eingabe angenommen und den Leerlaufzähler zurückgesetzt, sie kommt also an. Dann hilft meist die Methode **Taste und Maus**, ein kürzeres Intervall (30 s) oder das Abschalten des intelligenten Modus. Heißt es „Test fehlgeschlagen“, lehnt Windows die Eingabe ab oder wertet sie nicht als Aktivität; dann hilft eine andere Methode oder Taste. Zeigt die Statuskarte oben „Eingaben werden abgelehnt“, blockiert Windows die Eingabe (gesperrte Sitzung, getrennte Remote-Sitzung oder Sicherheitssoftware). Das **Protokoll** zeigt, wann das passiert ist.
 
 **In einem Terminal oder einer Remote-Sitzung erscheinen seltsame Zeichen.**
 Stelle im Reiter *Aktivität* die **Taste** auf „Umschalttaste“ oder nutze nur die Methode **Mausbewegung**.
@@ -101,7 +101,7 @@ Eine Richtlinie verbietet dann das Schreiben des Autostart-Eintrags. StayGreen m
 Kann StayGreen eine Datei nicht schreiben (Ordner schreibgeschützt, Pfad ungültig), erscheint einmal ein Hinweis, und im Reiter *System* steht der Grund in Rot an der betroffenen Einstellung.
 
 **Ein Fehler im Programm.**
-Fehler, die StayGreen abfängt, damit das Aktivhalten weiterläuft, landen in `error.log` im Einstellungsordner (Reiter *System* → *Einstellungsordner* → Öffnen). Dieselbe Meldung wird nur gezählt, nicht jedes Mal ausgeschrieben; die Datei bleibt unter 256 KB. Hängst du sie an eine Fehlermeldung an, hilft das sehr.
+Fehler, die StayGreen abfängt, damit das Aktivhalten weiterläuft, landen in `error.log` im Einstellungsordner (Reiter *System* → **Einstellungsordner öffnen**). Dieselbe Meldung wird nur gezählt, nicht jedes Mal ausgeschrieben; die Datei bleibt unter 256 KB. Hängst du sie an eine Fehlermeldung an, hilft das sehr.
 
 **Alles zurücksetzen.**
 StayGreen beenden, den Ordner `%APPDATA%\StayGreen` löschen. Den Autostart vorher im Reiter *System* ausschalten (dabei wird der Eintrag unter `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` entfernt). Mehr hinterlässt StayGreen nicht.

@@ -179,6 +179,7 @@ namespace StayGreen.UI
             var form = new MainForm(this);
             form.ActivityPage.TestRequested = TestInput;
             form.SystemPage.DefaultLogPath = () => SettingsStore.DefaultLogPath;
+            form.SystemPage.TypedCharacter = KeyboardLayouts.TypedCharacter;
             form.SystemPage.OpenFolderRequested = OpenSettingsFolder;
             form.SystemPage.OpenLogRequested = OpenLogFile;
             form.SystemPage.OpenReleasePageRequested = OpenReleasePage;
