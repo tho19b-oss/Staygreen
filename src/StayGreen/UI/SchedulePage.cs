@@ -32,7 +32,7 @@ namespace StayGreen.UI
         // Eine Zeile je Zeitfenster (die Zeilen werden wiederverwendet), dazu der Editor an der bearbeiteten Stelle. Ein Pixel
         // Abstand oben, damit die erste Zeile die Trennlinie nicht ueberdeckt.
         readonly Stack _list = new Stack { TopDivider = true, Inset = new Padding(0, 1, 0, 0) };
-        readonly List<RuleRow> _rows = new List<RuleRow>();
+        readonly List<ValueRow> _rows = new List<ValueRow>();
 
         readonly WrapLabel _emptyText = CreateHint();
         readonly FlatButton _addFirst = CreateButton(ButtonKind.Primary);
@@ -163,8 +163,8 @@ namespace StayGreen.UI
             var order = new List<Control>();
             for (int i = 0; i < _rows.Count; i++)
             {
-                RuleRow row = _rows[i];
-                if (i < count) row.SetRule(S.Rules[i], daysWidth);
+                ValueRow row = _rows[i];
+                if (i < count) ShowRule(row, S.Rules[i], daysWidth);
                 want(row, i < count && i != _editing);
                 order.Add(row);
                 if (i == _editing) order.Add(_editorRow);
@@ -195,8 +195,8 @@ namespace StayGreen.UI
         {
             while (_rows.Count < count)
             {
-                var row = new RuleRow();
-                row.EditButton.Click += (o, e) => OpenEditor(_rows.IndexOf(row));
+                var row = new ValueRow(true);
+                row.Button.Click += (o, e) => OpenEditor(_rows.IndexOf(row));
                 row.RemoveButton.Click += (o, e) => RemoveRule(_rows.IndexOf(row));
                 _tips.SetToolTip(row.RemoveButton, Loc.T("sch.remove"));
                 _rows.Add(row);
@@ -213,10 +213,21 @@ namespace StayGreen.UI
             return width;
         }
 
+        /// <summary>Zeigt ein Zeitfenster in einer Zeile an; <paramref name="daysWidth"/> ist die gemeinsame Breite der Tage-Spalte.</summary>
+        static void ShowRule(ValueRow row, ScheduleRule rule, int daysWidth)
+        {
+            string spoken = RuleFormatter.Describe(rule);
+            string pill = RuleFormatter.EndsNextDay(rule) ? Loc.T("sch.overnight") : "";
+            row.Button.SetContent(RuleFormatter.DaysLabel(rule.Days), RuleFormatter.Times(rule), pill, false);
+            row.Button.LabelWidth = daysWidth;
+            row.Button.AccessibleName = Loc.T("row.edit", spoken);
+            row.RemoveButton.AccessibleName = Loc.T("sch.row.remove", spoken);
+        }
+
         /// <summary>Wohin der Fokus nach einer Aenderung an Zeile <paramref name="index"/> geht: zu ihrem Knopf oder, wird sie gerade bearbeitet, in den Editor.</summary>
         Control RowFocus(int index)
         {
-            return index == _editing ? (Control)_days[0] : _rows[index].EditButton;
+            return index == _editing ? (Control)_days[0] : _rows[index].Button;
         }
 
         /// <summary>Vorlage fuer die leere Liste: Mo-Fr 08:00-17:00 direkt uebernehmen.</summary>
@@ -282,7 +293,7 @@ namespace StayGreen.UI
             _editing = NotEditing;
 
             Control focus = null;
-            if (hadFocus) focus = index >= 0 ? _rows[index].EditButton : (RuleCount > 0 ? _add : _addFirst);
+            if (hadFocus) focus = index >= 0 ? _rows[index].Button : (RuleCount > 0 ? _add : _addFirst);
             Sync(focus);
         }
 
@@ -310,7 +321,7 @@ namespace StayGreen.UI
             bool hadFocus = _editor.ContainsFocus;
             _editing = NotEditing;
             EnsureRows(S.Rules.Count);
-            Sync(hadFocus ? _rows[index].EditButton : null);
+            Sync(hadFocus ? _rows[index].Button : null);
             Fire();
         }
 
@@ -401,10 +412,10 @@ namespace StayGreen.UI
             _from.AccessibleName = Loc.T("sch.from");
             _to.AccessibleName = Loc.T("sch.to");
             _nextDay.Text = Loc.T("sch.nextday");
-            _save.Text = Loc.T("sch.save");
-            _cancel.Text = Loc.T("sch.cancel");
+            _save.Text = Loc.T("btn.save");
+            _cancel.Text = Loc.T("btn.cancel");
             _delete.Text = Loc.T("sch.remove");
-            foreach (RuleRow row in _rows) _tips.SetToolTip(row.RemoveButton, Loc.T("sch.remove"));
+            foreach (ValueRow row in _rows) _tips.SetToolTip(row.RemoveButton, Loc.T("sch.remove"));
 
             UpdateEditorState();
             Sync(null);
@@ -426,139 +437,6 @@ namespace StayGreen.UI
         protected override void Dispose(bool disposing)
         {
             if (disposing) _tips.Dispose();
-            base.Dispose(disposing);
-        }
-    }
-
-    /// <summary>Eine Zeile der Liste: links der Zeilen-Knopf (bearbeiten), rechts der Muelleimer (entfernen).</summary>
-    sealed class RuleRow : LayoutPanel
-    {
-        public RuleRow()
-        {
-            Inset = new Padding(0, 4, 0, 4);
-            BottomDivider = true;
-            Controls.Add(EditButton);
-            Controls.Add(RemoveButton);
-        }
-
-        public RuleButton EditButton { get; } = new RuleButton();
-
-        public IconButton RemoveButton { get; } = new IconButton { Icon = IconKind.Trash };
-
-        /// <summary>Zeigt ein Zeitfenster an; <paramref name="daysWidth"/> ist die gemeinsame Breite der Tage-Spalte.</summary>
-        public void SetRule(ScheduleRule rule, int daysWidth)
-        {
-            string spoken = RuleFormatter.Describe(rule);
-            string pill = RuleFormatter.EndsNextDay(rule) ? Loc.T("sch.overnight") : "";
-            EditButton.SetContent(RuleFormatter.DaysLabel(rule.Days), RuleFormatter.Times(rule), pill, daysWidth);
-            EditButton.AccessibleName = Loc.T("sch.row.edit", spoken);
-            RemoveButton.AccessibleName = Loc.T("sch.row.remove", spoken);
-        }
-
-        public override int MeasureHeight(int width)
-        {
-            return EditButton.PreferredHeight + Dpi.Px(Inset.Vertical);
-        }
-
-        protected override void DoLayout()
-        {
-            int top = Dpi.Px(Inset.Top);
-            int height = Math.Max(1, ClientSize.Height - Dpi.Px(Inset.Vertical));
-            Size remove = RemoveButton.Size;
-            EditButton.SetBounds(0, top, Math.Max(1, ClientSize.Width - remove.Width - Dpi.Px(4)), height);
-            RemoveButton.SetBounds(ClientSize.Width - remove.Width, top + (height - remove.Height) / 2, remove.Width, remove.Height);
-        }
-    }
-
-    /// <summary>
-    /// Der Zeilen-Knopf: Tage, Uhrzeit, bei Bedarf "ueber Nacht" und rechts ein Stift als Hinweis, dass ein Klick (oder
-    /// Leertaste/Eingabe) die Zeile zum Bearbeiten oeffnet.
-    /// </summary>
-    sealed class RuleButton : PaintedButton
-    {
-        string _days = "";
-        string _times = "";
-        string _pill = "";
-        int _daysWidth;
-        Font _timeFont;
-        Font _pillFont;
-
-        public RuleButton()
-        {
-            UpdateFonts();
-        }
-
-        /// <summary>Hoehe der Zeile: genug fuer die groessere Schrift der Uhrzeit, mindestens 44 Pixel.</summary>
-        public int PreferredHeight
-        {
-            get { return Math.Max(Dpi.Px(44), _timeFont.Height + Dpi.Px(18)); }
-        }
-
-        public void SetContent(string days, string times, string pill, int daysWidth)
-        {
-            if (_days == days && _times == times && _pill == pill && _daysWidth == daysWidth) return;
-            _days = days;
-            _times = times;
-            _pill = pill;
-            _daysWidth = daysWidth;
-            Invalidate();
-        }
-
-        void UpdateFonts()
-        {
-            Font oldTime = _timeFont;
-            Font oldPill = _pillFont;
-            _timeFont = Fonts.Semibold(Font, 1.5f);
-            _pillFont = Fonts.Smaller(Font, 0.75f);
-            if (oldTime != null) oldTime.Dispose();
-            if (oldPill != null) oldPill.Dispose();
-        }
-
-        protected override void OnFontChanged(EventArgs e)
-        {
-            base.OnFontChanged(e);
-            UpdateFonts();
-            Invalidate();
-        }
-
-        protected override void OnPaint(PaintEventArgs e)
-        {
-            Graphics g = e.Graphics;
-            Draw.Background(g, this);
-            if (Hover || Down)
-                Metrics.PaintRounded(g, ClientRectangle, Dpi.Px(8), Down ? Theme.Track : Theme.Chip, Color.Empty);
-
-            int icon = Dpi.Px(IconPainter.Size);
-            int right = Width - Dpi.Px(10) - icon;   // hier beginnt der Stift
-            int x = Dpi.Px(8);
-            int daysWidth = Math.Min(_daysWidth, Math.Max(Dpi.Px(40), (right - x) / 2));
-            Draw.LeftText(g, _days, Font, new Rectangle(x, 0, daysWidth, Height), Theme.MutedStrong);
-            x += daysWidth + Dpi.Px(12);
-
-            int timesWidth = Math.Min(Metrics.TextWidth(_times, _timeFont), Math.Max(1, right - Dpi.Px(8) - x));
-            Draw.LeftText(g, _times, _timeFont, new Rectangle(x, 0, timesWidth, Height), Theme.Text);
-            x += timesWidth + Dpi.Px(10);
-
-            if (_pill.Length > 0)
-            {
-                Size pill = PillPainter.Measure(_pill, _pillFont);
-                if (x + pill.Width <= right - Dpi.Px(8))
-                    PillPainter.Paint(g, new Rectangle(x, (Height - pill.Height) / 2, pill.Width, pill.Height), _pill, _pillFont);
-            }
-
-            IconPainter.Draw(g, IconKind.Pencil, new Rectangle(right, (Height - icon) / 2, icon, icon),
-                Hover || Down ? Theme.Text : Theme.Muted);
-            if (Focused && ShowFocusCues)
-                Draw.FocusRing(g, Rectangle.Inflate(ClientRectangle, -Dpi.Px(2), -Dpi.Px(2)), Dpi.Px(6));
-        }
-
-        protected override void Dispose(bool disposing)
-        {
-            if (disposing)
-            {
-                if (_timeFont != null) _timeFont.Dispose();
-                if (_pillFont != null) _pillFont.Dispose();
-            }
             base.Dispose(disposing);
         }
     }

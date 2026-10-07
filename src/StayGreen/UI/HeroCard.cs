@@ -7,8 +7,9 @@ namespace StayGreen.UI
 {
     /// <summary>
     /// Die grosse Statuskarte oben im Fenster: Lampe, Zustand, Details, Zeitplan-Zeile und der Start/Stopp-Knopf.
-    /// Haelt StayGreen aktiv (oder steht bereit), folgt eine Zeile mit den Pausen-Knoepfen, waehrend einer Pause stattdessen
-    /// "Fortsetzen" neben dem Stopp-Knopf. Der Hintergrund faerbt sich zart passend zum Zustand (gruen, gelb, rot, grau).
+    /// Haelt StayGreen aktiv (oder steht bereit), folgen in der Textspalte kleine Pausen-Knoepfe ("30 Min."), waehrend einer
+    /// Pause stattdessen "Fortsetzen" neben dem Stopp-Knopf. Der Hintergrund faerbt sich zart passend zum Zustand (gruen,
+    /// gelb, rot, grau).
     /// </summary>
     sealed class HeroCard : LayoutPanel
     {
@@ -59,7 +60,7 @@ namespace StayGreen.UI
             for (int i = 0; i < PauseMinutes.Length; i++)
             {
                 int minutes = PauseMinutes[i];
-                var button = new FlatButton { Kind = ButtonKind.Secondary, Visible = false };
+                var button = new FlatButton { Kind = ButtonKind.Secondary, Compact = true, Visible = false };
                 button.Click += (o, e) =>
                 {
                     Action<int> handler = PauseClicked;
@@ -121,15 +122,15 @@ namespace StayGreen.UI
                 changed = true;
             }
 
-            string pauseText = Loc.T("hero.pause");
-            changed |= SetText(_pauseLabel, pauseText);
+            changed |= SetText(_pauseLabel, Loc.T("hero.pause"));
             for (int i = 0; i < PauseMinutes.Length; i++)
             {
-                string text = StatusBuilder.PauseLabel(PauseMinutes[i]);
+                int minutes = PauseMinutes[i];
+                string text = minutes % 60 == 0 ? Loc.T("hero.pause.hours", minutes / 60) : Loc.T("hero.pause.minutes", minutes);
                 changed |= SetText(_pauseButtons[i], text);
 
-                // Fuer Screenreader mit Zusammenhang: "Pause fuer 30 Minuten" statt nur "30 Minuten".
-                string name = pauseText.TrimEnd(':') + " " + text;
+                // Fuer Screenreader ausgeschrieben und mit Zusammenhang: "Pause fuer 30 Minuten" statt nur "30 Min.".
+                string name = Loc.T("hero.pause.name", StatusBuilder.PauseLabel(minutes));
                 if (_pauseButtons[i].AccessibleName != name) _pauseButtons[i].AccessibleName = name;
             }
             return changed;
@@ -240,8 +241,8 @@ namespace StayGreen.UI
             // Alles darunter beginnt erst unterhalb der Lampe.
             y = Math.Max(y, pad + lamp);
 
-            // Die Pausen-Zeile beginnt am linken Kartenrand (unter der Lampe), damit sie die ganze Breite nutzen kann.
-            if (_canPause) y = ArrangePauseRow(pad, width - pad, y + Dpi.Px(10), apply);
+            // Die Pausen-Zeile steht in der Textspalte unter dem Titel; links bleibt die Lampe fuer sich.
+            if (_canPause) y = ArrangePauseRow(textLeft, width - pad, y + Dpi.Px(10), apply);
 
             return y + pad;
         }

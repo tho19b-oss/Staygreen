@@ -470,6 +470,9 @@ namespace StayGreen.UI
         const TextFormatFlags LeftAligned = TextFormatFlags.Left | TextFormatFlags.VerticalCenter
             | TextFormatFlags.SingleLine | TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix | TextFormatFlags.EndEllipsis;
 
+        const TextFormatFlags Wrapped = TextFormatFlags.Left | TextFormatFlags.WordBreak | TextFormatFlags.NoPadding
+            | TextFormatFlags.NoPrefix | TextFormatFlags.TextBoxControl;
+
         public static void Background(Graphics g, Control c)
         {
             g.Clear(c.Parent != null ? c.Parent.BackColor : Theme.Background);
@@ -484,6 +487,12 @@ namespace StayGreen.UI
         public static void LeftText(Graphics g, string text, Font font, Rectangle bounds, Color color)
         {
             TextRenderer.DrawText(g, text, font, bounds, color, LeftAligned);
+        }
+
+        /// <summary>Mehrzeiliger Text, der an Wortgrenzen umbricht (die Hoehe liefert <see cref="Metrics.TextHeight"/>).</summary>
+        public static void WrappedText(Graphics g, string text, Font font, Rectangle bounds, Color color)
+        {
+            TextRenderer.DrawText(g, text, font, bounds, color, Wrapped);
         }
 
         /// <summary>Gepunkteter Rahmen fuer die Tastaturbedienung.</summary>
@@ -688,9 +697,23 @@ namespace StayGreen.UI
 
         ButtonKind _kind = ButtonKind.Secondary;
         IconKind _icon;
+        bool _compact;
 
         /// <summary>Mindestbreite in logischen Pixeln.</summary>
         public int MinWidth { get; set; }
+
+        /// <summary>Flacher und mit weniger Rand (z. B. die Pausen-Knoepfe in der Statuskarte).</summary>
+        public bool Compact
+        {
+            get { return _compact; }
+            set
+            {
+                if (_compact == value) return;
+                _compact = value;
+                Fit();
+                Invalidate();
+            }
+        }
 
         public ButtonKind Kind
         {
@@ -719,10 +742,10 @@ namespace StayGreen.UI
 
         void Fit()
         {
-            int padding = Dpi.Px(_kind == ButtonKind.Danger ? 16 : 32);
+            int padding = Dpi.Px(_kind == ButtonKind.Danger ? 16 : (_compact ? 24 : 32));
             int icon = _icon == IconKind.None ? 0 : Dpi.Px(IconPainter.Size + IconGap);
-            Size = new Size(Math.Max(Dpi.Px(MinWidth), Metrics.TextWidth(Text, Font) + padding + icon),
-                Math.Max(Dpi.Px(36), Font.Height + Dpi.Px(16)));
+            int height = _compact ? Math.Max(Dpi.Px(30), Font.Height + Dpi.Px(10)) : Math.Max(Dpi.Px(36), Font.Height + Dpi.Px(16));
+            Size = new Size(Math.Max(Dpi.Px(MinWidth), Metrics.TextWidth(Text, Font) + padding + icon), height);
         }
 
         protected override void OnTextChanged(EventArgs e)
@@ -909,6 +932,18 @@ namespace StayGreen.UI
 
         public static void Paint(Graphics g, Rectangle bounds, string text, Font font)
         {
+            Paint(g, bounds, text, font, false);
+        }
+
+        /// <summary><paramref name="warn"/>: rot getoent fuer einen Hinweis, der Aufmerksamkeit braucht (z. B. "zu lang").</summary>
+        public static void Paint(Graphics g, Rectangle bounds, string text, Font font, bool warn)
+        {
+            if (warn)
+            {
+                Metrics.PaintRounded(g, bounds, bounds.Height / 2, Theme.TintFor(StatusKind.Blocked), Theme.TintBorderFor(StatusKind.Blocked));
+                Draw.CenteredText(g, text, font, bounds, Theme.DangerText);
+                return;
+            }
             Metrics.PaintRounded(g, bounds, bounds.Height / 2, Theme.Chip, Theme.CardBorder);
             Draw.CenteredText(g, text, font, bounds, Theme.MutedStrong);
         }
@@ -985,6 +1020,12 @@ namespace StayGreen.UI
         }
 
         public event EventHandler SelectedIndexChanged;
+
+        /// <summary>
+        /// Der Nutzer hat einen Eintrag ausdruecklich gewaehlt: per Klick, Eingabe oder Leertaste. Die Pfeiltasten wechseln
+        /// nur die Markierung. So kann eine Auswahl, die sofort gilt, auf diesen Moment warten.
+        /// </summary>
+        public event EventHandler Committed;
 
         /// <summary>Groesse automatisch den Eintraegen anpassen (fuer Leisten, die nicht die ganze Breite fuellen).</summary>
         public bool AutoFit { get; set; }
@@ -1187,12 +1228,15 @@ namespace StayGreen.UI
             if (e.Button != MouseButtons.Left) return;
             Focus();
             int hit = HitTest(e.X);
-            if (hit >= 0) SelectedIndex = hit;
+            if (hit < 0) return;
+            SelectedIndex = hit;
+            OnCommitted();
         }
 
         protected override bool IsInputKey(Keys keyData)
         {
-            return keyData == Keys.Left || keyData == Keys.Right || base.IsInputKey(keyData);
+            return keyData == Keys.Left || keyData == Keys.Right || keyData == Keys.Enter || keyData == Keys.Space
+                || base.IsInputKey(keyData);
         }
 
         protected override void OnKeyDown(KeyEventArgs e)
@@ -1200,6 +1244,18 @@ namespace StayGreen.UI
             base.OnKeyDown(e);
             if (e.KeyCode == Keys.Left) { SelectedIndex = _selected - 1; e.Handled = true; }
             else if (e.KeyCode == Keys.Right) { SelectedIndex = _selected + 1; e.Handled = true; }
+            else if (e.KeyCode == Keys.Enter || e.KeyCode == Keys.Space)
+            {
+                e.Handled = true;
+                e.SuppressKeyPress = true;
+                OnCommitted();
+            }
+        }
+
+        void OnCommitted()
+        {
+            EventHandler handler = Committed;
+            if (handler != null) handler(this, EventArgs.Empty);
         }
 
         protected override void OnFontChanged(EventArgs e)
