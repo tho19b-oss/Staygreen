@@ -101,18 +101,6 @@ namespace StayGreen.UI
             return control;
         }
 
-        /// <summary>Uhrzeitfeld im 24-Stunden-Format mit Auf/Ab-Knoepfen.</summary>
-        protected static DateTimePicker CreateTimePicker()
-        {
-            return Style(new DateTimePicker
-            {
-                Format = DateTimePickerFormat.Custom,
-                CustomFormat = "HH:mm",
-                ShowUpDown = true,
-                Width = Dpi.Px(80),
-            });
-        }
-
         /// <summary>Datumsfeld im kurzen Datumsformat der Windows-Regionseinstellungen.</summary>
         protected static DateTimePicker CreateDatePicker()
         {

@@ -21,8 +21,8 @@
     <AnalysisLevel>latest</AnalysisLevel>
     <AnalysisMode>Recommended</AnalysisMode>
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
-    <Version>1.5.0</Version>
-    <FileVersion>1.5.0.0</FileVersion>
+    <Version>1.5.1</Version>
+    <FileVersion>1.5.1.0</FileVersion>
     <Product>StayGreen</Product>
     <AssemblyTitle>StayGreen</AssemblyTitle>
     <Company>StayGreen</Company>

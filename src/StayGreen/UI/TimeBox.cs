@@ -25,6 +25,7 @@ namespace StayGreen.UI
         int _pending = -1;     // erste Ziffer einer zweistelligen Eingabe, -1 = keine
         int _hoverArrow;       // +1 = oberer Pfeil, -1 = unterer, 0 = keiner
         int _pressedArrow;
+        bool _compact;
 
         public TimeBox()
         {
@@ -43,6 +44,21 @@ namespace StayGreen.UI
         }
 
         public event EventHandler ValueChanged;
+
+        /// <summary>
+        /// Flach wie die Windows-Eingabefelder, z. B. neben einem Datums- oder Zahlenfeld; sonst so hoch wie die runden
+        /// Wochentag-Knoepfe im Zeitplan.
+        /// </summary>
+        public bool Compact
+        {
+            get { return _compact; }
+            set
+            {
+                if (_compact == value) return;
+                _compact = value;
+                Fit();
+            }
+        }
 
         /// <summary>Die Uhrzeit; nur Stunden und Minuten zaehlen (Sekunden und ganze Tage fallen weg).</summary>
         public TimeSpan Value
@@ -277,7 +293,8 @@ namespace StayGreen.UI
         void Fit()
         {
             int text = Metrics.TextWidth("00:00", Font);
-            Size = new Size(Math.Max(Dpi.Px(84), text + Dpi.Px(48)), Math.Max(Dpi.Px(32), Font.Height + Dpi.Px(12)));
+            int height = _compact ? Math.Max(Dpi.Px(23), Font.Height + Dpi.Px(8)) : Math.Max(Dpi.Px(32), Font.Height + Dpi.Px(12));
+            Size = new Size(Math.Max(Dpi.Px(84), text + Dpi.Px(48)), height);
         }
 
         protected override void OnFontChanged(EventArgs e)

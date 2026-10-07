@@ -14,9 +14,9 @@ namespace StayGreen.UI
 
         readonly SwitchBox _enable = CreateSwitch();
         readonly Segmented _when = new Segmented();
-        readonly DateTimePicker _dailyTime = CreateTimePicker();
+        readonly TimeBox _dailyTime = new TimeBox { Compact = true };
         readonly DateTimePicker _onceDate = CreateDatePicker();
-        readonly DateTimePicker _onceTime = CreateTimePicker();
+        readonly TimeBox _onceTime = new TimeBox { Compact = true };
         readonly SwitchBox _teams = CreateSwitch();
         readonly SwitchBox _lock = CreateSwitch();
         readonly SwitchBox _shutdown = CreateSwitch();
@@ -98,8 +98,7 @@ namespace StayGreen.UI
             _dailyTime.ValueChanged += (o, e) =>
             {
                 if (Loading || S == null) return;
-                TimeSpan t = _dailyTime.Value.TimeOfDay;
-                S.AutoStopTime = new TimeSpan(t.Hours, t.Minutes, 0);
+                S.AutoStopTime = _dailyTime.Value;
                 Fire();
             };
             EventHandler onceChanged = (o, e) =>
@@ -130,8 +129,7 @@ namespace StayGreen.UI
 
         DateTime OnceValue()
         {
-            DateTime time = _onceTime.Value;
-            return _onceDate.Value.Date.AddHours(time.Hour).AddMinutes(time.Minute);
+            return _onceDate.Value.Date + _onceTime.Value;
         }
 
         /// <summary>Sinnvoller Vorschlag fuer "einmalig": heute 17:00, sonst morgen 17:00.</summary>
@@ -146,11 +144,11 @@ namespace StayGreen.UI
             ApplyTexts();
             _enable.Checked = s.AutoStopEnabled;
             _when.SelectedIndex = (int)s.AutoStopTiming;
-            _dailyTime.Value = DateTime.Today + s.AutoStopTime;
+            _dailyTime.Value = s.AutoStopTime;
             DateTime once = s.AutoStopOnce == DateTime.MinValue ? SuggestOnce() : s.AutoStopOnce;
             once = once < _onceDate.MinDate ? _onceDate.MinDate : (once > _onceDate.MaxDate ? _onceDate.MaxDate : once);
             _onceDate.Value = once;
-            _onceTime.Value = once;
+            _onceTime.Value = once.TimeOfDay;
             _teams.Checked = s.StopCloseTeams;
             _lock.Checked = s.StopLock;
             _shutdown.Checked = s.StopShutdown;
