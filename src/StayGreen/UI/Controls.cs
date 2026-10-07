@@ -338,8 +338,8 @@ namespace StayGreen.UI
         }
 
         /// <summary>
-        /// Faerbt ein Standard-Eingabefeld (Auswahl, Text, Datum) passend zum dunklen Design. Hell und Kontrastdesign
-        /// uebernimmt Windows selbst.
+        /// Faerbt ein Standard-Eingabefeld (Auswahl, Text) passend zum dunklen Design. Hell und Kontrastdesign uebernimmt
+        /// Windows selbst.
         /// </summary>
         public static void StyleInput(Control control)
         {
@@ -350,16 +350,6 @@ namespace StayGreen.UI
 
             var combo = control as ComboBox;
             if (combo != null) combo.FlatStyle = FlatStyle.Flat;
-
-            var picker = control as DateTimePicker;
-            if (picker != null)
-            {
-                picker.CalendarMonthBackground = Card;
-                picker.CalendarForeColor = Text;
-                picker.CalendarTitleBackColor = GreenButton;
-                picker.CalendarTitleForeColor = OnAccent;
-                picker.CalendarTrailingForeColor = Disabled;
-            }
         }
     }
 
@@ -855,6 +845,7 @@ namespace StayGreen.UI
         Plus,
         Pencil,
         Trash,
+        Calendar,
     }
 
     static class IconPainter
@@ -893,6 +884,14 @@ namespace StayGreen.UI
                         g.DrawLines(pen, new[] { p(6, 7), p(7, 20), p(17, 20), p(18, 7) });
                         g.DrawLine(pen, p(10, 11), p(10, 16));
                         g.DrawLine(pen, p(14, 11), p(14, 16));
+                        break;
+                    case IconKind.Calendar:
+                        PointF topLeft = p(4, 5.5f);
+                        PointF bottomRight = p(20, 20);
+                        g.DrawRectangle(pen, topLeft.X, topLeft.Y, bottomRight.X - topLeft.X, bottomRight.Y - topLeft.Y);
+                        g.DrawLine(pen, p(4, 10), p(20, 10));
+                        g.DrawLine(pen, p(8.5f, 3.5f), p(8.5f, 7));
+                        g.DrawLine(pen, p(15.5f, 3.5f), p(15.5f, 7));
                         break;
                 }
             }

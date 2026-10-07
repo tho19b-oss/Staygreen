@@ -26,12 +26,12 @@ namespace StayGreen.UI
         readonly EditableRow _whenRow = new EditableRow(EditorKind.Input);
         readonly Segmented _when = new Segmented();
         readonly Label _dailyLabel = CreateEditorLabel();
-        readonly TimeBox _dailyTime = new TimeBox { Compact = true };
+        readonly TimeBox _dailyTime = new TimeBox();
         readonly FlowRow _dailyRow;
         readonly Label _dateLabel = CreateEditorLabel();
-        readonly DateTimePicker _onceDate = CreateDatePicker();
+        readonly DateBox _onceDate = new DateBox();
         readonly Label _onceTimeLabel = CreateEditorLabel();
-        readonly TimeBox _onceTime = new TimeBox { Compact = true };
+        readonly TimeBox _onceTime = new TimeBox();
         readonly FlowRow _onceRow;
         readonly WrapLabel _scheduleHint = CreateEditorHint();
 
@@ -70,6 +70,7 @@ namespace StayGreen.UI
             _whenRow.AddContent(_when);
             _whenRow.AddContent(_dailyRow);
             _whenRow.AddContent(_onceRow);
+            _whenRow.AddContent(_onceDate.Calendar);   // klappt unter Datum und Uhrzeit auf
             _whenRow.AddContent(_scheduleHint);
 
             _actionsRow.WrapValue = true;
@@ -97,6 +98,11 @@ namespace StayGreen.UI
             _whenRow.Opening += FillWhen;
             _when.SelectedIndexChanged += (o, e) => UpdateWhenEditor();
             _onceDate.ValueChanged += (o, e) => UpdateWhenProblem();
+            _onceDate.CalendarToggled += (o, e) =>
+            {
+                RefreshLayout();
+                if (_onceDate.CalendarOpen) ScrollIntoView(_onceDate.Calendar);
+            };
             _onceTime.ValueChanged += (o, e) => UpdateWhenProblem();
             _whenRow.SaveRequested += SaveWhen;
 
@@ -196,10 +202,11 @@ namespace StayGreen.UI
         void FillWhen()
         {
             if (S == null) return;
+            _onceDate.CloseCalendar();   // der Editor beginnt immer zugeklappt
             _when.SelectedIndex = (int)S.AutoStopTiming;
             _dailyTime.Value = S.AutoStopTime;
             DateTime once = S.AutoStopOnce == DateTime.MinValue ? SuggestOnce() : S.AutoStopOnce;
-            once = once < _onceDate.MinDate ? _onceDate.MinDate : (once > _onceDate.MaxDate ? _onceDate.MaxDate : once);
+            _onceDate.Minimum = DateTime.Today;   // ein Tag in der Vergangenheit loest nie aus: ein alter Termin rueckt auf heute
             _onceDate.Value = once;
             _onceTime.Value = once.TimeOfDay;
             UpdateWhenEditor();
@@ -221,6 +228,7 @@ namespace StayGreen.UI
         void UpdateWhenEditor()
         {
             StopTiming timing = SelectedTiming;
+            if (timing != StopTiming.Once) _onceDate.CloseCalendar();
             _dailyRow.Visible = timing == StopTiming.Daily;
             _onceRow.Visible = timing == StopTiming.Once;
             _scheduleHint.Visible = timing == StopTiming.ScheduleEnd;
@@ -321,6 +329,7 @@ namespace StayGreen.UI
             _dailyTime.AccessibleName = Loc.T("stop.time");
             _dateLabel.Text = Loc.T("stop.date");
             _onceDate.AccessibleName = Loc.T("stop.date");
+            _onceDate.ApplyTexts();
             _onceTimeLabel.Text = Loc.T("stop.time");
             _onceTime.AccessibleName = Loc.T("stop.time");
             _scheduleHint.Text = Loc.T("stop.schedule.hint");

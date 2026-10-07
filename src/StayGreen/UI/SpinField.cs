@@ -7,8 +7,8 @@ namespace StayGreen.UI
 {
     /// <summary>
     /// Gemeinsame Basis der selbst gezeichneten Eingabefelder mit zwei kleinen Pfeilen rechts (<see cref="TimeBox"/>,
-    /// <see cref="NumberBox"/>): ein abgerundetes Feld im Stil der Karten, das sich anders als die Windows-Felder auch im
-    /// dunklen Design einfaerbt. Mit dem Fokus ist der Rand gruen. Ein Pfeil aendert den Wert um einen Schritt, gedrueckt
+    /// <see cref="NumberBox"/>, <see cref="DateBox"/>): ein abgerundetes Feld im Stil der Karten, das sich anders als die
+    /// Windows-Felder auch im dunklen Design einfaerbt. Mit dem Fokus ist der Rand gruen. Ein Pfeil aendert den Wert um einen Schritt, gedrueckt
     /// gehalten zaehlt er nach einer kurzen Pause schnell weiter (wie beim Windows-Feld); geht es in eine Richtung nicht
     /// weiter, ist der Pfeil ausgegraut. Das Mausrad aendert den Wert nur, solange das Feld den Fokus hat; sonst rollt wie
     /// gewohnt die Seite.
@@ -22,7 +22,6 @@ namespace StayGreen.UI
         readonly Timer _repeat = new Timer();
         int _hoverArrow;       // +1 = oberer Pfeil, -1 = unterer, 0 = keiner
         int _pressedArrow;
-        bool _compact;
 
         protected SpinField()
         {
@@ -37,21 +36,6 @@ namespace StayGreen.UI
                 _repeat.Interval = 70;
                 Step(_pressedArrow);
             };
-        }
-
-        /// <summary>
-        /// Flach wie die Windows-Eingabefelder, z. B. neben dem Datumsfeld; sonst so hoch wie die runden Wochentag-Knoepfe
-        /// im Zeitplan.
-        /// </summary>
-        public bool Compact
-        {
-            get { return _compact; }
-            set
-            {
-                if (_compact == value) return;
-                _compact = value;
-                Fit();
-            }
         }
 
         /// <summary>Linker Rand des Inhalts.</summary>
@@ -80,10 +64,19 @@ namespace StayGreen.UI
         /// <summary>Zeichnet den Inhalt ab <see cref="TextLeft"/>; <paramref name="fore"/> ist die Textfarbe (ausgegraut, wenn gesperrt).</summary>
         protected abstract void PaintContent(Graphics g, Color fore);
 
-        /// <summary>Groesse passend zu Schrift und Inhalt. Die abgeleiteten Felder rufen das am Ende ihres Konstruktors auf.</summary>
+        /// <summary>Gruener Rand: mit dem Fokus (beim Datumsfeld auch, solange sein Kalender offen ist).</summary>
+        protected virtual bool ShowsFocus
+        {
+            get { return Focused; }
+        }
+
+        /// <summary>
+        /// Groesse passend zu Schrift und Inhalt, so hoch wie die runden Wochentag-Knoepfe im Zeitplan. Die abgeleiteten
+        /// Felder rufen das am Ende ihres Konstruktors auf.
+        /// </summary>
         protected void Fit()
         {
-            int height = _compact ? Math.Max(Dpi.Px(23), Font.Height + Dpi.Px(8)) : Math.Max(Dpi.Px(32), Font.Height + Dpi.Px(12));
+            int height = Math.Max(Dpi.Px(32), Font.Height + Dpi.Px(12));
             Size = new Size(Math.Max(Dpi.Px(84), ContentWidth + Dpi.Px(48)), height);
         }
 
@@ -224,7 +217,7 @@ namespace StayGreen.UI
             Draw.Background(g, this);
 
             bool enabled = Enabled;
-            Color border = enabled && Focused ? Theme.Green : Theme.FieldBorder;
+            Color border = enabled && ShowsFocus ? Theme.Green : Theme.FieldBorder;
             Metrics.PaintRounded(g, ClientRectangle, Dpi.Px(6), enabled ? Theme.InputBack : Theme.Track, border);
             PaintContent(g, enabled ? Theme.Text : Theme.Disabled);
 
