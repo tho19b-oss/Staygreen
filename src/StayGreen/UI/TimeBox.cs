@@ -18,6 +18,9 @@ namespace StayGreen.UI
         const int HourPart = 0;
         const int MinutePart = 1;
 
+        const TextFormatFlags TextFlags = TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine
+            | TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix | TextFormatFlags.PreserveGraphicsClipping;
+
         readonly Timer _repeat = new Timer();
         int _hours;
         int _minutes;
@@ -213,7 +216,9 @@ namespace StayGreen.UI
             }
             else
             {
-                SelectPart(e.X < MinuteBounds.Left ? HourPart : MinutePart);
+                Rectangle hours, minutes;
+                GetParts(out hours, out minutes);
+                SelectPart(e.X < (hours.Right + minutes.Left) / 2 ? HourPart : MinutePart);
             }
             Invalidate();
         }
@@ -303,23 +308,18 @@ namespace StayGreen.UI
             Fit();
         }
 
-        int DigitsWidth
+        /// <summary>
+        /// Wo im Text "HH:mm" Stunden und Minuten stehen (fuer Markierung und Mausklick). Gemessen werden nur Ziffernfolgen
+        /// und der ganze Text: Den Doppelpunkt allein misst Windows breiter, als er im Text steht.
+        /// </summary>
+        void GetParts(out Rectangle hours, out Rectangle minutes)
         {
-            get { return Metrics.TextWidth("00", Font); }
-        }
-
-        Rectangle HourBounds
-        {
-            get { return new Rectangle(Dpi.Px(10), 0, DigitsWidth, Height); }
-        }
-
-        Rectangle MinuteBounds
-        {
-            get
-            {
-                Rectangle hours = HourBounds;
-                return new Rectangle(hours.Right + Metrics.TextWidth(":", Font), 0, DigitsWidth, Height);
-            }
+            int digits = Metrics.TextWidth("0000", Font);
+            int pair = digits / 2;
+            int colon = Math.Max(1, Metrics.TextWidth("00:00", Font) - digits);
+            int left = Dpi.Px(10);
+            hours = new Rectangle(left, 0, pair, Height);
+            minutes = new Rectangle(left + pair + colon, 0, pair, Height);
         }
 
         Rectangle ArrowBounds
@@ -349,31 +349,44 @@ namespace StayGreen.UI
             Color border = enabled && focused ? Theme.Green : Theme.FieldBorder;
             Metrics.PaintRounded(g, ClientRectangle, Dpi.Px(6), enabled ? Theme.InputBack : Theme.Track, border);
 
-            Rectangle hours = HourBounds;
-            Rectangle minutes = MinuteBounds;
-            DrawPart(g, hours, _hours, focused && _part == HourPart);
-            Draw.CenteredText(g, ":", Font, new Rectangle(hours.Right, 0, minutes.Left - hours.Right, Height),
-                enabled ? Theme.Text : Theme.Disabled);
-            DrawPart(g, minutes, _minutes, focused && _part == MinutePart);
+            // Die Uhrzeit in einem Zug zeichnen, damit Ziffern und Doppelpunkt so dicht stehen wie in normalem Text.
+            Rectangle hours, minutes;
+            GetParts(out hours, out minutes);
+            string text = _hours.ToString("00", CultureInfo.InvariantCulture) + ":"
+                + _minutes.ToString("00", CultureInfo.InvariantCulture);
+            var bounds = new Rectangle(hours.Left, 0, minutes.Right - hours.Left + Dpi.Px(6), Height);
+            Color fore = enabled ? Theme.Text : Theme.Disabled;
+            if (focused)
+            {
+                // Der gewaehlte Teil gruen hinterlegt und weiss: derselbe Text zweimal, jeweils passend beschnitten. Zum
+                // Doppelpunkt hin bleibt die Markierung schmal, damit sie ihn nicht anschneidet.
+                Rectangle part = _part == HourPart ? hours : minutes;
+                int outer = Dpi.Px(2);
+                int inner = Dpi.Px(1);
+                int height = Font.Height + Dpi.Px(2);
+                int markLeft = part.X - (_part == HourPart ? outer : inner);
+                var mark = new Rectangle(markLeft, (Height - height) / 2, part.Width + outer + inner, height);
+                Metrics.PaintRounded(g, mark, Dpi.Px(3), Theme.GreenButton, Color.Empty);
+                using (var outside = new Region(ClientRectangle))
+                {
+                    outside.Exclude(mark);
+                    g.SetClip(outside, CombineMode.Replace);
+                    TextRenderer.DrawText(g, text, Font, bounds, fore, TextFlags);
+                }
+                g.SetClip(mark);
+                TextRenderer.DrawText(g, text, Font, bounds, Theme.OnAccent, TextFlags);
+                g.ResetClip();
+            }
+            else
+            {
+                TextRenderer.DrawText(g, text, Font, bounds, fore, TextFlags);
+            }
 
             Rectangle arrows = ArrowBounds;
             int middle = arrows.Top + arrows.Height / 2;
             int center = arrows.Left + arrows.Width / 2;
             DrawArrow(g, center, middle - Dpi.Px(4), true, ArrowColor(1));
             DrawArrow(g, center, middle + Dpi.Px(4), false, ArrowColor(-1));
-        }
-
-        void DrawPart(Graphics g, Rectangle bounds, int value, bool selected)
-        {
-            Color fore = Enabled ? Theme.Text : Theme.Disabled;
-            if (selected)
-            {
-                int height = Font.Height + Dpi.Px(2);
-                var mark = new Rectangle(bounds.X - Dpi.Px(2), (Height - height) / 2, bounds.Width + Dpi.Px(4), height);
-                Metrics.PaintRounded(g, mark, Dpi.Px(3), Theme.GreenButton, Color.Empty);
-                fore = Theme.OnAccent;
-            }
-            Draw.CenteredText(g, value.ToString("00", CultureInfo.InvariantCulture), Font, bounds, fore);
         }
 
         Color ArrowColor(int arrow)
