@@ -68,7 +68,6 @@ namespace StayGreen.UI
         bool _balloonShown;
         bool _noticePending;
         volatile bool _sessionLocked;
-        DateTime _lastPrune = DateTime.MinValue;
         string _appliedTheme;
         string _hotkeySignature;
         HotkeyState _hotkeyState = HotkeyState.Off;
@@ -107,7 +106,6 @@ namespace StayGreen.UI
             _tray.ToggleRequested += () => Toggle(Loc.T("reason.tray"));
             _tray.ShowRequested += ShowMainWindow;
             _tray.ResumeRequested += ResumeFromPause;
-            _tray.SkipTodayRequested += ToggleSkipToday;
             _tray.ExitRequested += ExitApp;
             _tray.PauseRequested += minutes => PauseFor(minutes, Loc.T("reason.tray"));
             _tray.AutostartRequested += enabled =>
@@ -127,7 +125,6 @@ namespace StayGreen.UI
             _timer.Tick += (o, e) => OnTick();
 
             DateTime now = DateTime.Now;
-            DateRange.Prune(_settings.Exceptions, now);
             _autoStop.Reschedule(now);
 
             bool start = _cmd.StartRequested || (_settings.StartHoldingOnLaunch && !_cmd.NoStartRequested);
@@ -262,17 +259,6 @@ namespace StayGreen.UI
             RefreshUi(DateTime.Now);
         }
 
-        /// <summary>"Heute aussetzen": Der Zeitplan beginnt heute kein Fenster mehr (oder wieder, wenn er schon ausgesetzt war).</summary>
-        void ToggleSkipToday()
-        {
-            DateTime today = DateTime.Today;
-            if (_settings.IsExcluded(today)) DateRange.Include(_settings.Exceptions, today);
-            else DateRange.Exclude(_settings.Exceptions, today);
-            SaveSettings();
-            _form.LoadSettings(_settings);
-            RefreshUi(DateTime.Now);
-        }
-
         /// <summary>"Eingabe testen": blockiert kurz (gut 300 ms), bis klar ist, ob Windows die Eingabe als Aktivitaet wertet.</summary>
         InputTestResult TestInput()
         {
@@ -325,14 +311,7 @@ namespace StayGreen.UI
             try
             {
                 DrainPendingEvents();
-                PruneExceptionsDaily(now);
-
-                bool wasRunning = _engine.Running;
                 _engine.Tick(now);
-                if (wasRunning && !_engine.Running && _engine.StoppedAutomatically)
-                    _tray.ShowBalloon(Loc.T("app.title"), Loc.T("balloon.maxruntime", Format.Duration(TimeSpan.FromHours(_settings.MaxRuntimeHours))),
-                        ToolTipIcon.Info);
-
                 CheckAutoStop(now);
             }
             catch (Exception ex)
@@ -340,18 +319,6 @@ namespace StayGreen.UI
                 CrashLog.Write(ex);
             }
             RefreshUi(now);
-        }
-
-        /// <summary>Raeumt vergangene Urlaubstage einmal pro Tag auf.</summary>
-        void PruneExceptionsDaily(DateTime now)
-        {
-            if (now.Date == _lastPrune) return;
-            _lastPrune = now.Date;
-            int before = _settings.Exceptions.Count;
-            DateRange.Prune(_settings.Exceptions, now);
-            if (_settings.Exceptions.Count == before) return;
-            SaveSettings();
-            _form.LoadSettings(_settings);
         }
 
         // ------------------------------------------------------------------ Auto-Stopp
@@ -537,8 +504,6 @@ namespace StayGreen.UI
                 {
                     Running = _engine.Running,
                     Paused = _engine.State == HolderState.Paused,
-                    ScheduleActive = _settings.ScheduleActive,
-                    SkippedToday = _settings.IsExcluded(now),
                     Autostart = _settings.StartWithWindows,
                 });
             }

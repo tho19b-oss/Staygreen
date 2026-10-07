@@ -187,6 +187,15 @@ namespace StayGreen.Tests
             var s = new Settings { ScheduleEnabled = true };   // aktiviert, aber ohne Fenster
             Assert.Null(StatusBuilder.ScheduleLine(s, T.Mon(10)));
         }
+
+        [Fact]
+        public void ScheduleLine_AtNight_SaysTodayForTheEnd()
+        {
+            var s = new Settings { ScheduleEnabled = true };
+            s.Rules.Add(new ScheduleRule(new[] { true, true, true, true, true, true, true }, T.Hm(22), T.Hm(6)));
+            Assert.Equal("Zeitplan: aktiv bis heute 06:00", StatusBuilder.ScheduleLine(s, T.Day(1, 3)));
+            Assert.Equal("Zeitplan: aktiv bis morgen 06:00", StatusBuilder.ScheduleLine(s, T.Day(1, 23)));
+        }
     }
 
     public class RuleFormatterTests : IDisposable

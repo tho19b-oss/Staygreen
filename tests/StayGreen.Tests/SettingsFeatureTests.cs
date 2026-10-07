@@ -22,8 +22,6 @@ namespace StayGreen.Tests
             var s = new Settings();
             Assert.Equal(ActivityKey.F15, s.InputKey);
             Assert.False(s.OnlyWhileTeamsRuns);
-            Assert.Equal(0, s.MaxRuntimeHours);
-            Assert.Empty(s.Exceptions);
             Assert.Equal(60, s.AutoStopWarnSeconds);
             Assert.Equal(15, s.AutoStopSnoozeMinutes);
             Assert.Equal("auto", s.Theme);
@@ -37,29 +35,22 @@ namespace StayGreen.Tests
             {
                 InputKey = ActivityKey.Shift,
                 OnlyWhileTeamsRuns = true,
-                MaxRuntimeHours = 10,
                 AutoStopTiming = StopTiming.ScheduleEnd,
                 AutoStopWarnSeconds = 90,
                 AutoStopSnoozeMinutes = 20,
                 Theme = "dark",
                 NoticeAccepted = true,
             };
-            s.Exceptions.Add(new DateRange(new DateTime(2026, 12, 24), new DateTime(2027, 1, 2)));
-            s.Exceptions.Add(new DateRange(new DateTime(2026, 11, 1), new DateTime(2026, 11, 1)));
 
             Settings p = Settings.Parse(s.Serialize());
 
             Assert.Equal(ActivityKey.Shift, p.InputKey);
             Assert.True(p.OnlyWhileTeamsRuns);
-            Assert.Equal(10, p.MaxRuntimeHours);
             Assert.Equal(StopTiming.ScheduleEnd, p.AutoStopTiming);
             Assert.Equal(90, p.AutoStopWarnSeconds);
             Assert.Equal(20, p.AutoStopSnoozeMinutes);
             Assert.Equal("dark", p.Theme);
             Assert.True(p.NoticeAccepted);
-            Assert.Equal(2, p.Exceptions.Count);
-            Assert.Equal("2026-11-01;2026-11-01", p.Exceptions[0].Serialize());       // sortiert beim Normalisieren
-            Assert.Equal("2026-12-24;2027-01-02", p.Exceptions[1].Serialize());
         }
 
         [Fact]
@@ -71,18 +62,32 @@ namespace StayGreen.Tests
             Assert.Equal(45, s.IntervalSeconds);
             Assert.Equal(ActivityKey.F15, s.InputKey);
             Assert.Equal(60, s.AutoStopWarnSeconds);
-            Assert.Empty(s.Exceptions);
             Assert.Single(s.Rules);
+        }
+
+        [Fact]
+        public void SettingsFile_WithRemovedFeatures_StillLoads_AndForgetsThem()
+        {
+            // Bis 1.3.0 gab es das Sicherheitsnetz (MaxRuntimeHours) und Ausnahmetage (Exception). Der 24.12.2026 ist ein
+            // Donnerstag: Der alte Urlaubseintrag darf das Zeitfenster nicht mehr unsichtbar abschalten.
+            string old = "Version=1\r\nIntervalSeconds=45\r\nMaxRuntimeHours=8\r\nScheduleEnabled=true\r\n"
+                         + "Rule=1111100;08:00;17:00\r\nException=2026-12-24;2026-12-31\r\n";
+            Settings s = Settings.Parse(old);
+            Assert.Equal(45, s.IntervalSeconds);
+            Assert.Single(s.Rules);
+            Assert.True(Scheduler.IsActive(new DateTime(2026, 12, 24, 10, 0, 0), s.Rules));
+
+            string saved = s.Serialize();
+            Assert.DoesNotContain("MaxRuntimeHours", saved);
+            Assert.DoesNotContain("Exception", saved);
         }
 
         [Fact]
         public void Parse_IgnoresGarbageInNewKeys()
         {
-            Settings s = Settings.Parse("InputKey=7\r\nInputKey=F99\r\nExtra=1\r\nException=nie\r\nMaxRuntimeHours=viel\r\n"
+            Settings s = Settings.Parse("InputKey=7\r\nInputKey=F99\r\nExtra=1\r\n"
                                         + "AutoStopWarnSeconds=\r\nTheme=bunt\r\nOnlyWhileTeamsRuns=vielleicht\r\n");
             Assert.Equal(ActivityKey.F15, s.InputKey);
-            Assert.Empty(s.Exceptions);
-            Assert.Equal(0, s.MaxRuntimeHours);
             Assert.Equal(60, s.AutoStopWarnSeconds);
             Assert.Equal("auto", s.Theme);
             Assert.False(s.OnlyWhileTeamsRuns);
@@ -100,36 +105,22 @@ namespace StayGreen.Tests
         {
             var s = new Settings
             {
-                MaxRuntimeHours = 500,
                 AutoStopWarnSeconds = 1,
                 AutoStopSnoozeMinutes = 9999,
                 Theme = " DARK ",
                 InputKey = (ActivityKey)99,
             };
             s.Normalize();
-            Assert.Equal(Settings.MaxRuntimeHoursLimit, s.MaxRuntimeHours);
             Assert.Equal(Settings.MinWarnSeconds, s.AutoStopWarnSeconds);
             Assert.Equal(Settings.MaxSnoozeMinutes, s.AutoStopSnoozeMinutes);
             Assert.Equal("dark", s.Theme);
             Assert.Equal(ActivityKey.F15, s.InputKey);
 
-            s.MaxRuntimeHours = -3;
             s.AutoStopWarnSeconds = 100000;
             s.Theme = null;
             s.Normalize();
-            Assert.Equal(0, s.MaxRuntimeHours);
             Assert.Equal(Settings.MaxWarnSeconds, s.AutoStopWarnSeconds);
             Assert.Equal("auto", s.Theme);
-        }
-
-        [Fact]
-        public void Normalize_MergesExceptions()
-        {
-            var s = new Settings();
-            s.Exceptions.Add(new DateRange(new DateTime(2026, 12, 27), new DateTime(2026, 12, 31)));
-            s.Exceptions.Add(new DateRange(new DateTime(2026, 12, 24), new DateTime(2026, 12, 26)));
-            s.Normalize();
-            Assert.Single(s.Exceptions);
         }
 
         [Theory]
@@ -152,35 +143,6 @@ namespace StayGreen.Tests
             Assert.Equal(2, (int)ActivityKey.F15);
             Assert.Equal(11, (int)ActivityKey.F24);
             Assert.Equal(12, (int)ActivityKey.Shift);
-        }
-    }
-
-    public class DescribeRangeTests : IDisposable
-    {
-        public DescribeRangeTests()
-        {
-            Loc.Language = "de";
-        }
-
-        public void Dispose()
-        {
-            Loc.Language = "de";
-        }
-
-        [Fact]
-        public void SingleDay_German()
-        {
-            Assert.Equal("24.12.2026  (1 Tag)",
-                RuleFormatter.Describe(new DateRange(new DateTime(2026, 12, 24), new DateTime(2026, 12, 24))));
-        }
-
-        [Fact]
-        public void Range_GermanAndEnglish()
-        {
-            var r = new DateRange(new DateTime(2026, 12, 24), new DateTime(2027, 1, 2));
-            Assert.Equal("24.12.2026 – 02.01.2027  (10 Tage)", RuleFormatter.Describe(r));
-            Loc.Language = "en";
-            Assert.Equal("Dec 24, 2026 – Jan 2, 2027  (10 days)", RuleFormatter.Describe(r));
         }
     }
 

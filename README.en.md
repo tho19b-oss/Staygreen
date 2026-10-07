@@ -43,15 +43,13 @@ Scoop also puts the command `StayGreen` on your path, so `StayGreen --toggle` or
 | **Smart mode** | Only acts while *you* are idle. While you work, StayGreen stays out of the way. |
 | **Keep PC awake** | Prevents standby, screen saver and automatic locking due to inactivity. **Your PC therefore stays unlocked when you walk away.** Lock it yourself (Win+L) when you are away for longer. |
 | **Teams only** | Optional: only hold while Teams is running. While Teams is closed, StayGreen waits and the PC may sleep. |
-| **Safety net** | Optional: stop automatically once holding has been running for that many hours in a row (in case you forget to switch it off). |
 | **Pause** | Stops StayGreen for 15 minutes up to 2 hours and carries on by itself. From the buttons in the status card at the top of the window (while StayGreen is holding), the notification-area icon or `--pause`. |
 | **Schedule** | On the *Schedule* tab: Only keep active in certain time windows, e.g. Mon–Fri 08:00–12:00 and 13:00–17:00. Several windows, any weekdays, also across midnight. Outside the windows StayGreen pauses and the PC may sleep. |
-| **Vacation and holidays** | On the *Schedule* tab: days or periods on which no window begins. The notification-area menu also has **Skip today**. StayGreen tidies up past periods itself. |
 | **Auto-stop** | On the *Schedule* tab, section "End of day": **daily** at a time, **once** at a date, or **at the end of the schedule** (end of the last window of a day; breaks shorter than 3 hours such as lunch do not count). Optionally with: **close Teams** (status changes to "Offline", a running call is ended), **lock Windows**, **shut down the computer** (programs are not closed by force) and **exit StayGreen**. |
 | **Warning** | Before "close Teams", "lock" and "shut down" a countdown appears (default 60 s) in which you can **cancel**, **postpone by 15 minutes** or **run now**. Focus starts on "Cancel", so an accidental key press triggers nothing. Appointments the PC slept through are not made up for. |
 | **Autostart** | Start with Windows, no admin rights (per-user autostart). |
 | **Start automatically when opened** | A double-click is enough. |
-| **Notification area (tray)** | Minimizing and closing park StayGreen next to the clock. The icon shows the state (green, amber, red, grey). Left click opens the window, **middle click starts/stops**. The menu offers start/stop, pause, resume, skip today and exit. |
+| **Notification area (tray)** | Minimizing and closing park StayGreen next to the clock. The icon shows the state (green, amber, red, grey). Left click opens the window, **middle click starts/stops**. The menu offers start/stop, pause, resume and exit. |
 | **Start minimized** | Tray icon only, no window. |
 | **Log** | Writes start, stop, pauses, auto-stop and also **lock/unlock, rejected input and standby** with time to a text file (default: `StayGreen-Protokoll.txt` in the settings folder). That makes it possible to see why your status flipped in between. From 1 MB StayGreen keeps one backup (`….txt.1`). |
 | **Global hotkey** | Start/stop with a key combination (default Ctrl+Alt+G, configurable: A–Z and F1–F24). Combinations that would type a character on your keyboard (Ctrl+Alt is AltGr on many keyboards, e.g. Ctrl+Alt+Q = "@" on the German one) are not registered; StayGreen explains why instead. |

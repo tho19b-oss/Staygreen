@@ -43,7 +43,6 @@ namespace StayGreen.Core
         bool _awakeApplied;
         DateTime _nextActivity;
         DateTime? _pausedUntil;
-        DateTime? _activeSince;
         DateTime _teamsCheckedAt = DateTime.MinValue;
         bool _teamsRunning = true;
 
@@ -87,9 +86,6 @@ namespace StayGreen.Core
             get { return _running && State == HolderState.Paused ? _pausedUntil : null; }
         }
 
-        /// <summary>True, wenn der letzte Stopp von der maximalen Laufzeit ausging (nicht vom Nutzer).</summary>
-        public bool StoppedAutomatically { get; private set; }
-
         /// <summary>Wann die naechste Eingabe geplant ist (nur sinnvoll im Zustand Active ohne Bereitschaft).</summary>
         public DateTime? NextActivityAt
         {
@@ -116,9 +112,7 @@ namespace StayGreen.Core
             ActivityCount = 0;
             ConsecutiveFailures = 0;
             StandingBy = false;
-            StoppedAutomatically = false;
             _pausedUntil = null;
-            _activeSince = now;
             State = HolderState.Active;
             _nextActivity = now;
             Log(now, "START", reason);
@@ -133,7 +127,6 @@ namespace StayGreen.Core
             State = HolderState.Stopped;
             StandingBy = false;
             _pausedUntil = null;
-            _activeSince = null;
             ApplyAwake(false);
             Log(now, "STOP", string.IsNullOrEmpty(reason)
                 ? Loc.T("log.runtime", Format.Duration(runtime))
@@ -170,15 +163,6 @@ namespace StayGreen.Core
         {
             if (!_running) return;
 
-            // Sicherheitsnetz: nach der eingestellten Dauer am Stueck von selbst stoppen.
-            if (_settings.MaxRuntimeHours > 0 && _activeSince.HasValue
-                && now - _activeSince.Value >= TimeSpan.FromHours(_settings.MaxRuntimeHours))
-            {
-                StoppedAutomatically = true;
-                Stop(now, Loc.T("reason.maxruntime", Format.Duration(now - _activeSince.Value)));
-                return;
-            }
-
             HolderState wanted = Decide(now);
             if (wanted != HolderState.Active)
             {
@@ -191,7 +175,6 @@ namespace StayGreen.Core
                 HolderState from = State;
                 State = HolderState.Active;
                 _nextActivity = now;
-                _activeSince = now;
                 Log(now, "RESUME", Loc.T(ResumeKey(from)));
             }
 
@@ -243,8 +226,8 @@ namespace StayGreen.Core
                 _pausedUntil = null;
             }
 
-            // Ausserhalb der Zeitfenster (oder an einem Ausnahmetag): nichts tun und den PC nicht wach halten.
-            if (_settings.ScheduleActive && !Scheduler.IsActive(now, _settings.Rules, _settings.Exceptions))
+            // Ausserhalb der Zeitfenster: nichts tun und den PC nicht wach halten.
+            if (_settings.ScheduleActive && !Scheduler.IsActive(now, _settings.Rules))
                 return HolderState.WaitingForWindow;
 
             if (_settings.OnlyWhileTeamsRuns && !TeamsRunning(now))
@@ -257,7 +240,6 @@ namespace StayGreen.Core
         {
             State = state;
             StandingBy = false;
-            _activeSince = null;
             ApplyAwake(false);
 
             // Die manuelle Pause wurde schon in Pause() protokolliert (mit Grund und Ende).

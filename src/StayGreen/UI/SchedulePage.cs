@@ -5,15 +5,11 @@ using StayGreen.Core;
 
 namespace StayGreen.UI
 {
-    /// <summary>
-    /// Zeitfenster, in denen aktiv gehalten wird (z. B. Mo-Fr 08:00-17:00), und Ausnahmetage (Urlaub, Feiertage),
-    /// an denen kein Fenster beginnt. Liegt auf der Seite "Zeitplan".
-    /// </summary>
+    /// <summary>Zeitfenster, in denen aktiv gehalten wird (z. B. Mo-Fr 08:00-17:00). Liegt auf der Seite "Zeitplan".</summary>
     sealed class SchedulePage : PageBase
     {
         readonly Card _card = new Card();
         readonly Card _editCard = new Card();
-        readonly Card _exCard = new Card();
 
         readonly SwitchBox _enable = CreateSwitch();
         readonly SettingRow _enableRow;
@@ -41,28 +37,6 @@ namespace StayGreen.UI
         readonly WrapLabel _daysLabel = new WrapLabel { ForeColor = Theme.Text };
         readonly WrapLabel _midnightHint = CreateHint();
         readonly WrapLabel _error = new WrapLabel { ForeColor = Theme.Red };
-
-        // Ausnahmetage
-        readonly ListBox _exList = new ListBox
-        {
-            BorderStyle = BorderStyle.None,
-            DrawMode = DrawMode.OwnerDrawFixed,
-            IntegralHeight = false,
-            Dock = DockStyle.Fill,
-            BackColor = Theme.Card,
-        };
-        readonly Frame _exFrame = new Frame();
-        readonly Stack _exListRow;
-        readonly Stack _exNoneRow;
-        readonly WrapLabel _exHint = CreateHint();
-        readonly WrapLabel _exNone = CreateHint();
-        readonly Label _exFromLabel = CreateLabel();
-        readonly Label _exToLabel = CreateLabel();
-        readonly DateTimePicker _exFrom = CreateDatePicker();
-        readonly DateTimePicker _exTo = CreateDatePicker();
-        readonly FlatButton _exAdd = CreateButton(ButtonKind.Primary);
-        readonly FlatButton _exRemove = CreateButton(ButtonKind.Secondary);
-        readonly WrapLabel _exError = new WrapLabel { ForeColor = Theme.Red };
 
         public SchedulePage()
         {
@@ -95,25 +69,8 @@ namespace StayGreen.UI
             _editCard.Add(Pad(_midnightHint, 4, 0));
             _editCard.Add(_error);
 
-            // Ausnahmetage: Liste, darunter von/bis und die Knoepfe.
-            _exFrame.Height = Dpi.Px(96);
-            _exFrame.Controls.Add(_exList);
-            _exList.ItemHeight = Dpi.Px(32);
-            _exList.DrawItem += DrawListItem;
-            _exListRow = Pad(_exFrame, 4, 6);
-            _exNoneRow = Pad(_exNone, 0, 4);
-            var exDateRow = new InlineRow(_exFromLabel, _exFrom, _exToLabel, _exTo) { Inset = new Padding(0, 4, 0, 4) };
-            var exButtonRow = new InlineRow(_exAdd, _exRemove) { Inset = new Padding(0, 6, 0, 2) };
-            _exCard.Add(Pad(_exHint, 0, 4));
-            _exCard.Add(_exListRow);
-            _exCard.Add(_exNoneRow);
-            _exCard.Add(exDateRow);
-            _exCard.Add(exButtonRow);
-            _exCard.Add(_exError);
-
             Controls.Add(_card);
             Controls.Add(_editCard);
-            Controls.Add(_exCard);
 
             _enable.CheckedChanged += (o, e) =>
             {
@@ -161,34 +118,9 @@ namespace StayGreen.UI
                 RefreshList(S.Rules.Count - 1);
                 Fire();
             };
-
-            _exList.SelectedIndexChanged += (o, e) => UpdateExceptionButtons();
-            _exAdd.Click += (o, e) =>
-            {
-                DateTime from = _exFrom.Value.Date;
-                DateTime to = _exTo.Value.Date;
-                if (to < from)
-                {
-                    SetExceptionError(Loc.T("exc.err.order"));
-                    return;
-                }
-                SetExceptionError("");
-                S.Exceptions.Add(new DateRange(from, to));
-                DateRange.Normalize(S.Exceptions);
-                RefreshExceptions(-1);
-                Fire();
-            };
-            _exRemove.Click += (o, e) =>
-            {
-                int index = _exList.SelectedIndex;
-                if (index < 0 || index >= S.Exceptions.Count) return;
-                S.Exceptions.RemoveAt(index);
-                RefreshExceptions(Math.Min(index, S.Exceptions.Count - 1));
-                Fire();
-            };
         }
 
-        /// <summary>Zeichnet einen Listeneintrag (Zeitfenster oder Ausnahme) im Stil der Karten.</summary>
+        /// <summary>Zeichnet einen Listeneintrag (Zeitfenster) im Stil der Karten.</summary>
         void DrawListItem(object sender, DrawItemEventArgs e)
         {
             var list = (ListBox)sender;
@@ -211,26 +143,16 @@ namespace StayGreen.UI
             _enable.Checked = s.ScheduleEnabled;
             RefreshList(s.Rules.Count > 0 ? 0 : -1);
             if (s.Rules.Count == 0) LoadEditor(ScheduleRule.Weekdays(new TimeSpan(8, 0, 0), new TimeSpan(17, 0, 0)));
-            Quiet(() =>
-            {
-                _exFrom.Value = DateTime.Today;
-                _exTo.Value = DateTime.Today;
-            });
-            RefreshExceptions(-1);
             UpdateVisibility();
         }
 
-        /// <summary>Listen und Editoren sind nur sichtbar, solange der Zeitplan eingeschaltet ist.</summary>
+        /// <summary>Liste und Editor sind nur sichtbar, solange der Zeitplan eingeschaltet ist.</summary>
         void UpdateVisibility()
         {
             bool on = _enable.Checked;
-            bool hasExceptions = S != null && S.Exceptions.Count > 0;
             _listRow.Visible = on;
             _info.Parent.Visible = on && _info.Text.Length > 0;
             _editCard.Visible = on;
-            _exCard.Visible = on;
-            _exListRow.Visible = on && hasExceptions;
-            _exNoneRow.Visible = on && !hasExceptions;
             RefreshLayout();
         }
 
@@ -248,30 +170,11 @@ namespace StayGreen.UI
             UpdateButtons();
         }
 
-        void RefreshExceptions(int select)
-        {
-            Quiet(() =>
-            {
-                _exList.Items.Clear();
-                if (S != null)
-                    foreach (DateRange range in S.Exceptions)
-                        _exList.Items.Add(RuleFormatter.Describe(range));
-                if (select >= 0 && select < _exList.Items.Count) _exList.SelectedIndex = select;
-            });
-            UpdateExceptionButtons();
-            UpdateVisibility();
-        }
-
         void UpdateButtons()
         {
             bool selected = _list.SelectedIndex >= 0;
             _update.Enabled = selected;
             _remove.Enabled = selected;
-        }
-
-        void UpdateExceptionButtons()
-        {
-            _exRemove.Enabled = _exList.SelectedIndex >= 0;
         }
 
         void LoadEditor(ScheduleRule rule)
@@ -315,13 +218,6 @@ namespace StayGreen.UI
             RefreshLayout();
         }
 
-        void SetExceptionError(string text)
-        {
-            _exError.Text = text;
-            _exError.Visible = text.Length > 0;
-            RefreshLayout();
-        }
-
         public override void ApplyTexts()
         {
             _card.Text = Loc.T("sch.grp.title");
@@ -347,23 +243,10 @@ namespace StayGreen.UI
             _midnightHint.Text = Loc.T("sch.hint.midnight");
             _error.Visible = _error.Text.Length > 0;
 
-            _exCard.Text = Loc.T("exc.grp");
-            _exHint.Text = Loc.T("exc.hint");
-            _exNone.Text = Loc.T("exc.none");
-            _exFromLabel.Text = Loc.T("sch.from");
-            _exToLabel.Text = Loc.T("sch.to");
-            _exFrom.AccessibleName = Loc.T("exc.grp") + ": " + Loc.T("sch.from");
-            _exTo.AccessibleName = Loc.T("exc.grp") + ": " + Loc.T("sch.to");
-            _exList.AccessibleName = Loc.T("exc.grp");
-            _exAdd.Text = Loc.T("sch.add");
-            _exRemove.Text = Loc.T("sch.remove");
-            _exError.Visible = _exError.Text.Length > 0;
-
             if (S != null)
             {
                 int selected = _list.SelectedIndex;
                 RefreshList(selected);
-                RefreshExceptions(_exList.SelectedIndex);
             }
             RefreshLayout();
         }

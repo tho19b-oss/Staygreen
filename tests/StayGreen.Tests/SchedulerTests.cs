@@ -75,6 +75,14 @@ namespace StayGreen.Tests
             return new List<ScheduleRule> { ScheduleRule.Weekdays(T.Hm(8), T.Hm(17)) };
         }
 
+        static List<ScheduleRule> Night()
+        {
+            return new List<ScheduleRule>
+            {
+                new ScheduleRule(new[] { true, true, true, true, true, true, true }, T.Hm(22), T.Hm(6)),
+            };
+        }
+
         [Theory]
         [InlineData(0, 7, 59, false)]
         [InlineData(0, 8, 0, true)]
@@ -214,6 +222,39 @@ namespace StayGreen.Tests
             };
             Assert.Equal(T.Day(5, 6), Scheduler.NextChange(T.Day(4, 23), rules));
             Assert.Equal(T.Day(4, 22), Scheduler.NextChange(T.Mon(9), rules));
+        }
+
+        // ---- Der Fehler aus der Review: Ende eines Fensters ueber Mitternacht, das am Vorabend begann ----
+
+        [Fact]
+        public void NextChange_InsideOvernightWindowAfterMidnight_IsTheEndTodayNotTomorrow()
+        {
+            // Dienstag 03:00, taeglich 22:00-06:00: Das Fenster endet heute um 06:00 (frueher: erst morgen).
+            Assert.Equal(T.Day(1, 6), Scheduler.NextChange(T.Day(1, 3), Night()));
+        }
+
+        [Fact]
+        public void NextChange_OvernightWindowOfASingleDay_EndsSameMorningNotNextWeek()
+        {
+            var friday = new List<ScheduleRule>
+            {
+                new ScheduleRule(new[] { false, false, false, false, true, false, false }, T.Hm(22), T.Hm(6)),
+            };
+            Assert.Equal(T.Day(5, 6), Scheduler.NextChange(T.Day(5, 3), friday));   // Samstag 03:00 -> Samstag 06:00
+            Assert.Equal(T.Day(5, 6), Scheduler.NextChange(T.Day(4, 23), friday));  // Freitag 23:00 -> Samstag 06:00
+        }
+
+        [Fact]
+        public void NextChange_WindowOnceAWeek_IsFoundAlmostAWeekAhead()
+        {
+            // Nur montags 00:00-23:00: Am Montagabend liegt der naechste Start fast eine Woche entfernt.
+            var monday = new List<ScheduleRule>
+            {
+                new ScheduleRule(new[] { true, false, false, false, false, false, false }, T.Hm(0), T.Hm(23)),
+            };
+            Assert.Equal(T.Day(7, 0), Scheduler.NextChange(T.Mon(23), monday));
+            Assert.Equal(T.Day(7, 0), Scheduler.NextChange(T.Mon(23, 59, 59), monday));
+            Assert.Equal(T.Day(7, 23), Scheduler.NextChange(T.Day(7, 0), monday));
         }
 
         [Fact]
