@@ -194,11 +194,36 @@ namespace StayGreen.Core
             return string.Join(", ", parts);
         }
 
+        /// <summary>Wie <see cref="Days"/>, aber am Zeilenanfang gross geschrieben ("Taeglich").</summary>
+        public static string DaysLabel(bool[] days)
+        {
+            string text = Days(days);
+            return text.Length == 0 ? text : char.ToUpper(text[0], CultureInfo.InvariantCulture) + text.Substring(1);
+        }
+
+        /// <summary>"08:00 - 17:00"; ein Ende um Mitternacht heisst "24:00".</summary>
+        public static string Times(ScheduleRule rule)
+        {
+            return ScheduleRule.FormatTime(rule.Start) + " – " + EndText(rule);
+        }
+
+        /// <summary>Endet das Fenster erst am Folgetag (22:00-06:00)? Ein Ende um Mitternacht zaehlt nicht dazu.</summary>
+        public static bool EndsNextDay(ScheduleRule rule)
+        {
+            return rule.CrossesMidnight && rule.End != TimeSpan.Zero;
+        }
+
+        /// <summary>Ein Zeitfenster als Satz fuer Screenreader: "Mo-Fr, 08:00 bis 17:00", "Fr, 22:00 bis 06:00 am Folgetag".</summary>
         public static string Describe(ScheduleRule rule)
         {
-            string text = Days(rule.Days) + "   " + ScheduleRule.FormatTime(rule.Start) + " – " + ScheduleRule.FormatTime(rule.End);
-            if (rule.CrossesMidnight) text += "  " + Loc.T("rule.overnight");
+            string text = Loc.T("rule.span", DaysLabel(rule.Days), ScheduleRule.FormatTime(rule.Start), EndText(rule));
+            if (EndsNextDay(rule)) text += " " + Loc.T("rule.overnight");
             return text;
+        }
+
+        static string EndText(ScheduleRule rule)
+        {
+            return rule.End == TimeSpan.Zero && rule.Start != TimeSpan.Zero ? "24:00" : ScheduleRule.FormatTime(rule.End);
         }
     }
 

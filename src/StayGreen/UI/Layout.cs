@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
@@ -106,6 +107,7 @@ namespace StayGreen.UI
     abstract class LayoutPanel : Panel, IMeasurable
     {
         bool _topDivider;
+        bool _bottomDivider;
         bool _inLayout;
 
         protected LayoutPanel()
@@ -129,6 +131,18 @@ namespace StayGreen.UI
             }
         }
 
+        /// <summary>Trennlinie am unteren Rand (unter jedem Eintrag einer Liste).</summary>
+        public bool BottomDivider
+        {
+            get { return _bottomDivider; }
+            set
+            {
+                if (_bottomDivider == value) return;
+                _bottomDivider = value;
+                Invalidate();
+            }
+        }
+
         public abstract int MeasureHeight(int width);
 
         protected abstract void DoLayout();
@@ -148,9 +162,12 @@ namespace StayGreen.UI
         protected override void OnPaint(PaintEventArgs e)
         {
             base.OnPaint(e);
-            if (_topDivider)
-                using (var pen = new Pen(Theme.Divider))
-                    e.Graphics.DrawLine(pen, 0, 0, Width, 0);
+            if (!_topDivider && !_bottomDivider) return;
+            using (var pen = new Pen(Theme.Divider))
+            {
+                if (_topDivider) e.Graphics.DrawLine(pen, 0, 0, Width, 0);
+                if (_bottomDivider) e.Graphics.DrawLine(pen, 0, Height - 1, Width, Height - 1);
+            }
         }
     }
 
@@ -273,6 +290,7 @@ namespace StayGreen.UI
         readonly WrapLabel _title = new WrapLabel();
         readonly WrapLabel _caption = new WrapLabel();
         readonly Control _accessory;
+        bool _heading;
 
         public SettingRow(Control accessory)
         {
@@ -331,6 +349,31 @@ namespace StayGreen.UI
                 _caption.Text = value ?? "";
                 _caption.Visible = _caption.Text.Length > 0;
             }
+        }
+
+        /// <summary>Titel wie eine Kartenueberschrift (fett, etwas groesser): fuer eine Zeile, die zugleich Kopf der Karte ist.</summary>
+        public bool Heading
+        {
+            get { return _heading; }
+            set
+            {
+                _heading = value;
+                UpdateTitleFont();
+            }
+        }
+
+        void UpdateTitleFont()
+        {
+            if (!_heading) return;
+            Font old = _title.Font;
+            _title.Font = new Font(Font.FontFamily, Font.Size + 0.5f, FontStyle.Bold);
+            if (old != null && !ReferenceEquals(old, Font)) old.Dispose();
+        }
+
+        protected override void OnFontChanged(EventArgs e)
+        {
+            base.OnFontChanged(e);
+            UpdateTitleFont();
         }
 
         public Color CaptionColor
@@ -512,21 +555,105 @@ namespace StayGreen.UI
         }
     }
 
-    /// <summary>Rahmen um ein einzelnes Steuerelement (z. B. die Liste der Zeitfenster).</summary>
-    sealed class Frame : Panel
+    /// <summary>
+    /// Waagerechte Reihe, die bei Platzmangel in die naechste Zeile umbricht (Knoepfe, Uhrzeitfelder). Mit
+    /// <see cref="PushLastRight"/> steht das letzte Element am rechten Rand (z. B. "Entfernen" neben "Speichern").
+    /// </summary>
+    sealed class FlowRow : LayoutPanel
     {
-        public Frame()
+        public FlowRow(params Control[] items)
         {
-            Padding = new Padding(1);
-            BackColor = Theme.Card;
-            DoubleBuffered = true;
-            ResizeRedraw = true;
+            Gap = 8;
+            LineGap = 8;
+            foreach (Control c in items) Controls.Add(c);
         }
 
-        protected override void OnPaint(PaintEventArgs e)
+        /// <summary>Abstand zwischen den Elementen einer Zeile in logischen Pixeln.</summary>
+        public int Gap { get; set; }
+
+        /// <summary>Abstand zwischen umbrochenen Zeilen in logischen Pixeln.</summary>
+        public int LineGap { get; set; }
+
+        /// <summary>Das letzte Element rechtsbuendig setzen (nur wenn es sichtbar ist; sonst bleibt alles links).</summary>
+        public bool PushLastRight { get; set; }
+
+        /// <summary>Beschriftungen messen sich selbst, alles andere behaelt die vom Ersteller gesetzte Groesse.</summary>
+        static Size SizeOf(Control c)
         {
-            base.OnPaint(e);
-            Metrics.PaintRounded(e.Graphics, ClientRectangle, Dpi.Px(6), Color.Empty, Theme.FieldBorder);
+            return c is Label && c.AutoSize ? c.GetPreferredSize(Size.Empty) : c.Size;
+        }
+
+        public override int MeasureHeight(int width)
+        {
+            return Arrange(width, false) + Dpi.Px(Inset.Vertical);
+        }
+
+        protected override void DoLayout()
+        {
+            Arrange(ClientSize.Width, true);
+        }
+
+        /// <summary>Verteilt die sichtbaren Elemente auf Zeilen; liefert die Hoehe ohne den Innenabstand.</summary>
+        int Arrange(int width, bool apply)
+        {
+            var items = new List<Control>();
+            foreach (Control c in Controls)
+                if (c.Visible) items.Add(c);
+
+            Control last = PushLastRight && Controls.Count > 0 ? Controls[Controls.Count - 1] : null;
+            int gap = Dpi.Px(Gap);
+            int y = 0;
+            int index = 0;
+            while (index < items.Count)
+            {
+                // Eine Zeile: so viele Elemente, wie nebeneinander passen (mindestens eins).
+                int first = index;
+                int x = 0;
+                int lineHeight = 0;
+                while (index < items.Count)
+                {
+                    Size s = SizeOf(items[index]);
+                    int needed = (index == first ? 0 : gap) + s.Width;
+                    if (index > first && x + needed > width) break;
+                    x += needed;
+                    lineHeight = Math.Max(lineHeight, s.Height);
+                    index++;
+                }
+
+                if (apply)
+                {
+                    int left = 0;
+                    int top = Dpi.Px(Inset.Top) + y;
+                    for (int i = first; i < index; i++)
+                    {
+                        Size s = SizeOf(items[i]);
+                        if (i > first) left += gap;
+                        int at = items[i] == last ? Math.Max(left, width - s.Width) : left;
+                        Stack.PlaceChild(items[i], new Rectangle(at, top + (lineHeight - s.Height) / 2, s.Width, s.Height));
+                        left += s.Width;
+                    }
+                }
+
+                y += lineHeight;
+                if (index < items.Count) y += Dpi.Px(LineGap);
+            }
+            return y;
+        }
+    }
+
+    /// <summary>Abgesetzte, zart getoente Flaeche mit runden Ecken innerhalb einer Karte (z. B. der aufgeklappte Editor).</summary>
+    sealed class TintBox : Stack
+    {
+        public TintBox()
+        {
+            BackColor = Theme.EditBack;
+            Inset = new Padding(12);
+        }
+
+        protected override void OnPaintBackground(PaintEventArgs e)
+        {
+            e.Graphics.Clear(Parent != null ? Parent.BackColor : Theme.Card);
+            Metrics.PaintRounded(e.Graphics, ClientRectangle, Dpi.Px(10), Theme.EditBack, Theme.EditBorder);
         }
     }
 
