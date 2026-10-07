@@ -150,6 +150,8 @@ jobs:
               Start-Sleep -Milliseconds 600
               Probe-Fields $win $name
             }
+            # Mauszeiger aus dem Fenster nehmen: Sonst steht er (Bildschirmmitte) ueber einer Zeile, die dann hervorgehoben ist.
+            [void][WinApi]::SetCursorPos(0, 0)
             Start-Sleep -Milliseconds 800
             $r = [WinApi]::FrameBounds($h)
             $w = $r.Right - $r.Left; $hgt = $r.Bottom - $r.Top

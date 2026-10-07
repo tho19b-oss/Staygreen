@@ -233,11 +233,41 @@ namespace StayGreen.Tests
         }
 
         [Fact]
-        public void Describe_ShowsTimesAndMidnightHint()
+        public void Describe_ReadsAsSentence_WithNextDayHint()
         {
-            Assert.Equal("Mo–Fr   08:00 – 17:00", RuleFormatter.Describe(ScheduleRule.Weekdays(T.Hm(8), T.Hm(17))));
+            Assert.Equal("Mo–Fr, 08:00 bis 17:00", RuleFormatter.Describe(ScheduleRule.Weekdays(T.Hm(8), T.Hm(17))));
             string night = RuleFormatter.Describe(new ScheduleRule(Days("0000100"), T.Hm(22), T.Hm(6)));
-            Assert.Equal("Fr   22:00 – 06:00  (bis zum Folgetag)", night);
+            Assert.Equal("Fr, 22:00 bis 06:00 am Folgetag", night);
+            Assert.Equal("Täglich, 18:00 bis 24:00", RuleFormatter.Describe(new ScheduleRule(Days("1111111"), T.Hm(18), T.Hm(0))));
+        }
+
+        [Fact]
+        public void Describe_English()
+        {
+            Loc.Language = "en";
+            string night = RuleFormatter.Describe(new ScheduleRule(Days("0000100"), T.Hm(22), T.Hm(6)));
+            Assert.Equal("Fri, 22:00 to 06:00 the next day", night);
+            Assert.Equal("Daily, 08:00 to 17:00", RuleFormatter.Describe(new ScheduleRule(Days("1111111"), T.Hm(8), T.Hm(17))));
+        }
+
+        [Theory]
+        [InlineData(8, 17, "08:00 – 17:00", false)]
+        [InlineData(22, 6, "22:00 – 06:00", true)]
+        [InlineData(18, 0, "18:00 – 24:00", false)]   // Ende um Mitternacht: kein Folgetag, sondern "24:00"
+        [InlineData(0, 8, "00:00 – 08:00", false)]
+        public void Times_AndNextDay(int start, int end, string expected, bool nextDay)
+        {
+            var rule = ScheduleRule.Weekdays(T.Hm(start), T.Hm(end));
+            Assert.Equal(expected, RuleFormatter.Times(rule));
+            Assert.Equal(nextDay, RuleFormatter.EndsNextDay(rule));
+        }
+
+        [Fact]
+        public void DaysLabel_StartsWithCapital()
+        {
+            Assert.Equal("Täglich", RuleFormatter.DaysLabel(Days("1111111")));
+            Assert.Equal("Mo–Fr", RuleFormatter.DaysLabel(Days("1111100")));
+            Assert.Equal("Kein Tag", RuleFormatter.DaysLabel(Days("0000000")));
         }
 
         [Fact]

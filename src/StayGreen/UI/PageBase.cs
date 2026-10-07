@@ -63,14 +63,27 @@ namespace StayGreen.UI
         /// <summary>Hoehe neu berechnen lassen (nach geaenderten Texten oder ein-/ausgeblendeten Zeilen).</summary>
         protected void RefreshLayout()
         {
-            for (Control c = Parent; c != null; c = c.Parent)
+            ScrollHost host = Host;
+            if (host != null) host.Relayout();
+        }
+
+        /// <summary>Rollt die Seite, bis <paramref name="control"/> ganz zu sehen ist (soweit es in das Fenster passt).</summary>
+        protected void ScrollIntoView(Control control)
+        {
+            ScrollHost host = Host;
+            if (host != null) host.ScrollControlIntoView(control);
+        }
+
+        ScrollHost Host
+        {
+            get
             {
-                var host = c as ScrollHost;
-                if (host != null)
+                for (Control c = Parent; c != null; c = c.Parent)
                 {
-                    host.Relayout();
-                    return;
+                    var host = c as ScrollHost;
+                    if (host != null) return host;
                 }
+                return null;
             }
         }
 

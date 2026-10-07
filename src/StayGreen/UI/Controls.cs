@@ -48,6 +48,10 @@ namespace StayGreen.UI
         /// <summary>Der gewaehlte Eintrag einer Auswahlleiste (Reiter): im dunklen Design heller als die Leiste.</summary>
         public static Color SegmentSelected;
 
+        // Text fuer Hinweise und Gefahr-Aktionen ("Entfernen"): kraeftiger als die Statusfarben, damit er auch auf den
+        // zarten Tonungen gut lesbar bleibt.
+        public static Color WarnText, DangerText;
+
         // Zarte Hintergruende der Statuskarte
         static Color _tintActive, _tintActiveBorder, _tintWait, _tintWaitBorder;
         static Color _tintBad, _tintBadBorder, _tintStopped, _tintStoppedBorder;
@@ -131,6 +135,8 @@ namespace StayGreen.UI
             OnAccent = Color.White;
             InputBack = Color.White;
             SegmentSelected = Color.White;
+            WarnText = Color.FromArgb(0x8F, 0x62, 0x00);
+            DangerText = Color.FromArgb(0xB4, 0x23, 0x18);
 
             GreenButton = Color.FromArgb(0x1F, 0x7F, 0x47);
             GreenButtonHover = Color.FromArgb(0x19, 0x6B, 0x3B);
@@ -177,6 +183,8 @@ namespace StayGreen.UI
             OnAccent = Color.White;
             InputBack = Color.FromArgb(0x2B, 0x30, 0x36);
             SegmentSelected = Color.FromArgb(0x43, 0x4A, 0x52);
+            WarnText = Amber;
+            DangerText = Color.FromArgb(0xF2, 0x8B, 0x82);
 
             GreenButton = Color.FromArgb(0x23, 0x86, 0x4F);
             GreenButtonHover = Color.FromArgb(0x29, 0x96, 0x58);
@@ -223,6 +231,8 @@ namespace StayGreen.UI
             OnAccent = SystemColors.HighlightText;
             InputBack = SystemColors.Window;
             SegmentSelected = SystemColors.Window;
+            WarnText = SystemColors.WindowText;
+            DangerText = SystemColors.HotTrack;
 
             GreenButton = SystemColors.Highlight;
             GreenButtonHover = SystemColors.HotTrack;
@@ -237,6 +247,17 @@ namespace StayGreen.UI
 
             _tintActive = _tintWait = _tintBad = _tintStopped = SystemColors.Window;
             _tintActiveBorder = _tintWaitBorder = _tintBadBorder = _tintStoppedBorder = SystemColors.WindowText;
+        }
+
+        /// <summary>Hintergrund eines aufgeklappten Editors in einer Karte: dieselbe zarte Tonung wie die aktive Statuskarte.</summary>
+        public static Color EditBack
+        {
+            get { return _tintActive; }
+        }
+
+        public static Color EditBorder
+        {
+            get { return _tintActiveBorder; }
         }
 
         public static Color ColorFor(StatusKind kind)
@@ -446,6 +467,9 @@ namespace StayGreen.UI
         const TextFormatFlags Centered = TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter
             | TextFormatFlags.SingleLine | TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix | TextFormatFlags.EndEllipsis;
 
+        const TextFormatFlags LeftAligned = TextFormatFlags.Left | TextFormatFlags.VerticalCenter
+            | TextFormatFlags.SingleLine | TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix | TextFormatFlags.EndEllipsis;
+
         public static void Background(Graphics g, Control c)
         {
             g.Clear(c.Parent != null ? c.Parent.BackColor : Theme.Background);
@@ -454,6 +478,12 @@ namespace StayGreen.UI
         public static void CenteredText(Graphics g, string text, Font font, Rectangle bounds, Color color)
         {
             TextRenderer.DrawText(g, text, font, bounds, color, Centered);
+        }
+
+        /// <summary>Einzeiliger Text, links beginnend und senkrecht zentriert; zu Langes endet mit "...".</summary>
+        public static void LeftText(Graphics g, string text, Font font, Rectangle bounds, Color color)
+        {
+            TextRenderer.DrawText(g, text, font, bounds, color, LeftAligned);
         }
 
         /// <summary>Gepunkteter Rahmen fuer die Tastaturbedienung.</summary>
@@ -584,16 +614,15 @@ namespace StayGreen.UI
 
         /// <summary>Dunkel gefuellt (z. B. "Stoppen").</summary>
         Dark,
+
+        /// <summary>Nur roter Text ohne Flaeche (z. B. "Entfernen"); beim Zeigen zart rot hinterlegt.</summary>
+        Danger,
     }
 
-    /// <summary>Abgerundeter Knopf. Passt seine Groesse selbst dem Text an.</summary>
-    sealed class FlatButton : Button
+    /// <summary>Gemeinsame Basis der selbst gezeichneten Knoepfe: merkt sich, ob die Maus darueber steht oder drueckt.</summary>
+    abstract class PaintedButton : Button
     {
-        bool _hover;
-        bool _down;
-        ButtonKind _kind = ButtonKind.Secondary;
-
-        public FlatButton()
+        protected PaintedButton()
         {
             SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer
                      | ControlStyles.ResizeRedraw, true);
@@ -601,6 +630,64 @@ namespace StayGreen.UI
             Cursor = Cursors.Hand;
             UseVisualStyleBackColor = false;
         }
+
+        protected bool Hover { get; private set; }
+
+        protected bool Down { get; private set; }
+
+        protected override void OnMouseEnter(EventArgs e)
+        {
+            base.OnMouseEnter(e);
+            Hover = true;
+            Invalidate();
+        }
+
+        protected override void OnMouseLeave(EventArgs e)
+        {
+            base.OnMouseLeave(e);
+            Hover = false;
+            Down = false;
+            Invalidate();
+        }
+
+        protected override void OnMouseDown(MouseEventArgs mevent)
+        {
+            base.OnMouseDown(mevent);
+            Down = true;
+            Invalidate();
+        }
+
+        protected override void OnMouseUp(MouseEventArgs mevent)
+        {
+            base.OnMouseUp(mevent);
+            Down = false;
+            Invalidate();
+        }
+
+        protected override void OnEnabledChanged(EventArgs e)
+        {
+            base.OnEnabledChanged(e);
+            Invalidate();
+        }
+
+        /// <summary>Ein ausgeblendeter Knopf bekommt kein MouseLeave mehr; beim naechsten Zeigen soll er nicht hervorgehoben sein.</summary>
+        protected override void OnVisibleChanged(EventArgs e)
+        {
+            base.OnVisibleChanged(e);
+            if (Visible) return;
+            Hover = false;
+            Down = false;
+        }
+    }
+
+    /// <summary>Abgerundeter Knopf, auf Wunsch mit Symbol vor dem Text. Passt seine Groesse selbst dem Text an.</summary>
+    sealed class FlatButton : PaintedButton
+    {
+        /// <summary>Abstand zwischen Symbol und Text in logischen Pixeln.</summary>
+        const int IconGap = 6;
+
+        ButtonKind _kind = ButtonKind.Secondary;
+        IconKind _icon;
 
         /// <summary>Mindestbreite in logischen Pixeln.</summary>
         public int MinWidth { get; set; }
@@ -612,13 +699,29 @@ namespace StayGreen.UI
             {
                 if (_kind == value) return;
                 _kind = value;
+                Fit();
+                Invalidate();
+            }
+        }
+
+        /// <summary>Symbol links vom Text (z. B. ein Plus bei "Zeitfenster hinzufuegen").</summary>
+        public IconKind Icon
+        {
+            get { return _icon; }
+            set
+            {
+                if (_icon == value) return;
+                _icon = value;
+                Fit();
                 Invalidate();
             }
         }
 
         void Fit()
         {
-            Size = new Size(Math.Max(Dpi.Px(MinWidth), Metrics.TextWidth(Text, Font) + Dpi.Px(32)),
+            int padding = Dpi.Px(_kind == ButtonKind.Danger ? 16 : 32);
+            int icon = _icon == IconKind.None ? 0 : Dpi.Px(IconPainter.Size + IconGap);
+            Size = new Size(Math.Max(Dpi.Px(MinWidth), Metrics.TextWidth(Text, Font) + padding + icon),
                 Math.Max(Dpi.Px(36), Font.Height + Dpi.Px(16)));
         }
 
@@ -634,41 +737,6 @@ namespace StayGreen.UI
             Fit();
         }
 
-        protected override void OnMouseEnter(EventArgs e)
-        {
-            base.OnMouseEnter(e);
-            _hover = true;
-            Invalidate();
-        }
-
-        protected override void OnMouseLeave(EventArgs e)
-        {
-            base.OnMouseLeave(e);
-            _hover = false;
-            _down = false;
-            Invalidate();
-        }
-
-        protected override void OnMouseDown(MouseEventArgs mevent)
-        {
-            base.OnMouseDown(mevent);
-            _down = true;
-            Invalidate();
-        }
-
-        protected override void OnMouseUp(MouseEventArgs mevent)
-        {
-            base.OnMouseUp(mevent);
-            _down = false;
-            Invalidate();
-        }
-
-        protected override void OnEnabledChanged(EventArgs e)
-        {
-            base.OnEnabledChanged(e);
-            Invalidate();
-        }
-
         protected override void OnPaint(PaintEventArgs e)
         {
             Graphics g = e.Graphics;
@@ -677,30 +745,226 @@ namespace StayGreen.UI
             Color fill, fore, border = Color.Empty;
             if (!Enabled)
             {
-                fill = Theme.Track;
+                fill = _kind == ButtonKind.Danger ? Color.Empty : Theme.Track;
                 fore = Theme.Disabled;
             }
             else if (_kind == ButtonKind.Primary)
             {
-                fill = _down ? Theme.GreenButtonDown : (_hover ? Theme.GreenButtonHover : Theme.GreenButton);
+                fill = Down ? Theme.GreenButtonDown : (Hover ? Theme.GreenButtonHover : Theme.GreenButton);
                 fore = Theme.OnAccent;
             }
             else if (_kind == ButtonKind.Dark)
             {
-                fill = _down ? Theme.GrayButtonDown : (_hover ? Theme.GrayButtonHover : Theme.GrayDark);
+                fill = Down ? Theme.GrayButtonDown : (Hover ? Theme.GrayButtonHover : Theme.GrayDark);
                 fore = Theme.OnAccent;
+            }
+            else if (_kind == ButtonKind.Danger)
+            {
+                fill = Down || Hover ? Theme.TintFor(StatusKind.Blocked) : Color.Empty;
+                fore = Theme.DangerText;
             }
             else
             {
-                fill = _down ? Theme.Track : (_hover ? Theme.Chip : Theme.Card);
+                fill = Down ? Theme.Track : (Hover ? Theme.Chip : Theme.Card);
                 fore = Theme.Text;
                 border = Theme.FieldBorder;
             }
 
             Metrics.PaintRounded(g, ClientRectangle, Dpi.Px(8), fill, border);
-            Draw.CenteredText(g, Text, Font, ClientRectangle, fore);
+            if (_icon == IconKind.None)
+            {
+                Draw.CenteredText(g, Text, Font, ClientRectangle, fore);
+            }
+            else
+            {
+                int size = Dpi.Px(IconPainter.Size);
+                int gap = Dpi.Px(IconGap);
+                int x = Math.Max(Dpi.Px(8), (Width - size - gap - Metrics.TextWidth(Text, Font)) / 2);
+                IconPainter.Draw(g, _icon, new Rectangle(x, (Height - size) / 2, size, size), fore);
+                int textLeft = x + size + gap;
+                Draw.LeftText(g, Text, Font, new Rectangle(textLeft, 0, Math.Max(1, Width - textLeft), Height), fore);
+            }
             if (Focused && ShowFocusCues)
                 Draw.FocusRing(g, Rectangle.Inflate(ClientRectangle, -Dpi.Px(3), -Dpi.Px(3)), Dpi.Px(6));
+        }
+    }
+
+    /// <summary>Quadratischer Knopf nur mit Symbol (z. B. Muelleimer); den Namen fuer Screenreader traegt AccessibleName.</summary>
+    sealed class IconButton : PaintedButton
+    {
+        IconKind _icon;
+
+        public IconButton()
+        {
+            Size = new Size(Dpi.Px(36), Dpi.Px(36));
+        }
+
+        public IconKind Icon
+        {
+            get { return _icon; }
+            set
+            {
+                if (_icon == value) return;
+                _icon = value;
+                Invalidate();
+            }
+        }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            Graphics g = e.Graphics;
+            Draw.Background(g, this);
+            if (Enabled && (Hover || Down))
+                Metrics.PaintRounded(g, ClientRectangle, Dpi.Px(8), Down ? Theme.Track : Theme.Chip, Color.Empty);
+
+            Color color = !Enabled ? Theme.Disabled : (Hover || Down ? Theme.Text : Theme.Muted);
+            int size = Dpi.Px(IconPainter.Size);
+            IconPainter.Draw(g, _icon, new Rectangle((Width - size) / 2, (Height - size) / 2, size, size), color);
+            if (Focused && ShowFocusCues)
+                Draw.FocusRing(g, Rectangle.Inflate(ClientRectangle, -Dpi.Px(2), -Dpi.Px(2)), Dpi.Px(6));
+        }
+    }
+
+    /// <summary>Linien-Symbole fuer Knoepfe (gezeichnet, damit sie in jeder Skalierung und Farbe scharf bleiben).</summary>
+    enum IconKind
+    {
+        None,
+        Plus,
+        Pencil,
+        Trash,
+    }
+
+    static class IconPainter
+    {
+        /// <summary>Kantenlaenge eines Symbols in logischen Pixeln.</summary>
+        public const int Size = 16;
+
+        /// <summary>Zeichnet das Symbol in <paramref name="bounds"/>; die Vorlagen liegen in einem Raster von 24 x 24.</summary>
+        public static void Draw(Graphics g, IconKind icon, Rectangle bounds, Color color)
+        {
+            if (icon == IconKind.None) return;
+            float scale = Math.Min(bounds.Width, bounds.Height) / 24f;
+            float left = bounds.X + (bounds.Width - 24 * scale) / 2f;
+            float top = bounds.Y + (bounds.Height - 24 * scale) / 2f;
+            Func<float, float, PointF> p = (x, y) => new PointF(left + x * scale, top + y * scale);
+
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+            using (var pen = new Pen(color, Math.Max(1.25f, 1.9f * scale)))
+            {
+                pen.StartCap = LineCap.Round;
+                pen.EndCap = LineCap.Round;
+                pen.LineJoin = LineJoin.Round;
+                switch (icon)
+                {
+                    case IconKind.Plus:
+                        g.DrawLine(pen, p(12, 5), p(12, 19));
+                        g.DrawLine(pen, p(5, 12), p(19, 12));
+                        break;
+                    case IconKind.Pencil:
+                        g.DrawPolygon(pen, new[] { p(4, 20), p(8, 20), p(19, 9), p(15, 5), p(4, 16) });
+                        g.DrawLine(pen, p(13.5f, 6.5f), p(17.5f, 10.5f));
+                        break;
+                    case IconKind.Trash:
+                        g.DrawLine(pen, p(4, 7), p(20, 7));
+                        g.DrawLines(pen, new[] { p(9, 7), p(9, 4), p(15, 4), p(15, 7) });
+                        g.DrawLines(pen, new[] { p(6, 7), p(7, 20), p(17, 20), p(18, 7) });
+                        g.DrawLine(pen, p(10, 11), p(10, 16));
+                        g.DrawLine(pen, p(14, 11), p(14, 16));
+                        break;
+                }
+            }
+        }
+    }
+
+    /// <summary>Abgeleitete Schriften zur Schrift der Umgebung.</summary>
+    static class Fonts
+    {
+        /// <summary>Halbfett (Segoe UI Semibold), wo es die Schrift gibt, sonst fett; um <paramref name="grow"/> Punkt groesser.</summary>
+        public static Font Semibold(Font basis, float grow)
+        {
+            float size = basis.Size + grow;
+            if (basis.FontFamily.Name == "Segoe UI")
+            {
+                var semibold = new Font("Segoe UI Semibold", size);
+                if (semibold.FontFamily.Name == "Segoe UI Semibold") return semibold;
+                semibold.Dispose();
+            }
+            return new Font(basis.FontFamily, size, FontStyle.Bold);
+        }
+
+        /// <summary>Um <paramref name="shrink"/> Punkt kleiner (z. B. fuer Kennzeichnungen).</summary>
+        public static Font Smaller(Font basis, float shrink)
+        {
+            return new Font(basis.FontFamily, basis.Size - shrink);
+        }
+    }
+
+    /// <summary>Kleine Kennzeichnung mit rundem Hintergrund, z. B. "ueber Nacht" hinter einer Uhrzeit.</summary>
+    static class PillPainter
+    {
+        public static Size Measure(string text, Font font)
+        {
+            return new Size(Metrics.TextWidth(text, font) + Dpi.Px(16), font.Height + Dpi.Px(4));
+        }
+
+        public static void Paint(Graphics g, Rectangle bounds, string text, Font font)
+        {
+            Metrics.PaintRounded(g, bounds, bounds.Height / 2, Theme.Chip, Theme.CardBorder);
+            Draw.CenteredText(g, text, font, bounds, Theme.MutedStrong);
+        }
+    }
+
+    /// <summary>Kennzeichnung als eigenes Element (z. B. "endet am Folgetag" neben den Uhrzeitfeldern).</summary>
+    sealed class Pill : Control
+    {
+        Font _small;
+
+        public Pill()
+        {
+            SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer
+                     | ControlStyles.ResizeRedraw, true);
+            SetStyle(ControlStyles.Selectable, false);
+            TabStop = false;
+            AccessibleRole = AccessibleRole.StaticText;
+            UpdateFont();
+        }
+
+        void UpdateFont()
+        {
+            Font old = _small;
+            _small = Fonts.Smaller(Font, 0.75f);
+            if (old != null) old.Dispose();
+            Fit();
+        }
+
+        void Fit()
+        {
+            Size = PillPainter.Measure(Text, _small);
+            Invalidate();
+        }
+
+        protected override void OnFontChanged(EventArgs e)
+        {
+            base.OnFontChanged(e);
+            UpdateFont();
+        }
+
+        protected override void OnTextChanged(EventArgs e)
+        {
+            base.OnTextChanged(e);
+            Fit();
+        }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            Draw.Background(e.Graphics, this);
+            PillPainter.Paint(e.Graphics, ClientRectangle, Text, _small);
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing && _small != null) _small.Dispose();
+            base.Dispose(disposing);
         }
     }
 
