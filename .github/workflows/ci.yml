@@ -158,7 +158,7 @@ jobs:
       - name: Herkunftsnachweis (Build-Provenance)
         if: github.event_name != 'pull_request'
         continue-on-error: true
-        uses: actions/attest-build-provenance@v3
+        uses: actions/attest-build-provenance@v4
         with:
           subject-path: |
             dist/StayGreen.exe
