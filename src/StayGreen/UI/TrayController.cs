@@ -11,17 +11,12 @@ namespace StayGreen.UI
     {
         public bool Running { get; set; }
         public bool Paused { get; set; }
-
-        /// <summary>Ein wirksamer Zeitplan ist eingeschaltet (nur dann gibt es "Heute aussetzen").</summary>
-        public bool ScheduleActive { get; set; }
-
-        public bool SkippedToday { get; set; }
         public bool Autostart { get; set; }
     }
 
     /// <summary>
     /// Das Symbol im Infobereich mit Zustandsfarbe und Menue. Linksklick zeigt das Fenster, Mittelklick startet oder stoppt.
-    /// Das Menue bietet Start/Stopp, Pausieren (15 Minuten bis 2 Stunden), Fortsetzen, "Heute aussetzen" und Beenden.
+    /// Das Menue bietet Start/Stopp, Pausieren (15 Minuten bis 2 Stunden), Fortsetzen und Beenden.
     /// </summary>
     sealed class TrayController : IDisposable
     {
@@ -36,7 +31,6 @@ namespace StayGreen.UI
         readonly ToolStripMenuItem _toggle = new ToolStripMenuItem();
         readonly ToolStripMenuItem _pause = new ToolStripMenuItem();
         readonly ToolStripMenuItem _resume = new ToolStripMenuItem();
-        readonly ToolStripMenuItem _skipToday = new ToolStripMenuItem();
         readonly ToolStripMenuItem _show = new ToolStripMenuItem();
         readonly ToolStripMenuItem _autostart = new ToolStripMenuItem { CheckOnClick = true };
         readonly ToolStripMenuItem _exit = new ToolStripMenuItem();
@@ -62,7 +56,6 @@ namespace StayGreen.UI
 
             _toggle.Click += (o, e) => Raise(ToggleRequested);
             _resume.Click += (o, e) => Raise(ResumeRequested);
-            _skipToday.Click += (o, e) => Raise(SkipTodayRequested);
             _show.Click += (o, e) => Raise(ShowRequested);
             _exit.Click += (o, e) => Raise(ExitRequested);
             _autostart.Click += (o, e) =>
@@ -88,7 +81,6 @@ namespace StayGreen.UI
             _menu.Items.Add(_toggle);
             _menu.Items.Add(_pause);
             _menu.Items.Add(_resume);
-            _menu.Items.Add(_skipToday);
             _menu.Items.Add(new ToolStripSeparator());
             _menu.Items.Add(_show);
             _menu.Items.Add(_autostart);
@@ -116,7 +108,6 @@ namespace StayGreen.UI
         public event Action ToggleRequested;
         public event Action ShowRequested;
         public event Action ResumeRequested;
-        public event Action SkipTodayRequested;
         public event Action ExitRequested;
         public event Action<int> PauseRequested;
         public event Action<bool> AutostartRequested;
@@ -167,8 +158,6 @@ namespace StayGreen.UI
             _toggle.Text = Loc.T(_state.Running ? "btn.stop" : "btn.start");
             _pause.Enabled = _state.Running && !_state.Paused;
             _resume.Visible = _state.Paused;
-            _skipToday.Visible = _state.ScheduleActive;
-            _skipToday.Text = Loc.T(_state.SkippedToday ? "tray.unskiptoday" : "tray.skiptoday");
             _autostart.Checked = _state.Autostart;
         }
 

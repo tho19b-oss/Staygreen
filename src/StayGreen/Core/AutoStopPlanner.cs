@@ -42,7 +42,7 @@ namespace StayGreen.Core
 
         /// <summary>
         /// Ende des naechsten "Arbeitstags": das erste Fensterende, auf das fuer mindestens <see cref="EndOfDayGap"/>
-        /// kein neues Fenster folgt. Ausnahmetage (Urlaub) sind schon im Zeitplan beruecksichtigt. Null ohne wirksamen Zeitplan.
+        /// kein neues Fenster folgt. Null ohne wirksamen Zeitplan.
         /// </summary>
         public static DateTime? NextScheduleEnd(Settings settings, DateTime now)
         {
@@ -51,18 +51,18 @@ namespace StayGreen.Core
             DateTime cursor = now;
             for (int step = 0; step < MaxSteps; step++)
             {
-                DateTime? change = Scheduler.NextChange(cursor, settings.Rules, settings.Exceptions);
+                DateTime? change = Scheduler.NextChange(cursor, settings.Rules);
                 if (!change.HasValue) return null;
 
                 // Ein Fenster beginnt: weiter zu seinem Ende.
-                if (Scheduler.IsActive(change.Value, settings.Rules, settings.Exceptions))
+                if (Scheduler.IsActive(change.Value, settings.Rules))
                 {
                     cursor = change.Value;
                     continue;
                 }
 
                 // Ein Fenster endet. Folgt bald das naechste, ist es nur eine Pause (z. B. Mittag).
-                DateTime? next = Scheduler.NextChange(change.Value, settings.Rules, settings.Exceptions);
+                DateTime? next = Scheduler.NextChange(change.Value, settings.Rules);
                 if (!next.HasValue || next.Value - change.Value >= EndOfDayGap) return change.Value;
                 cursor = next.Value;
             }

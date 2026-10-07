@@ -59,14 +59,6 @@ namespace StayGreen.Tests
         }
 
         [Fact]
-        public void VacationDays_AreSkipped()
-        {
-            Settings s = AtScheduleEnd(ScheduleRule.Weekdays(T.Hm(8), T.Hm(17)));
-            s.Exceptions.Add(new DateRange(T.Day(0), T.Day(2)));                     // Mo-Mi frei
-            Assert.Equal(T.Day(3, 17), AutoStopPlanner.NextDue(s, T.Mon(10)));
-        }
-
-        [Fact]
         public void WithoutAnEffectiveSchedule_NothingIsDue()
         {
             var noSchedule = new Settings { AutoStopEnabled = true, AutoStopTiming = StopTiming.ScheduleEnd };

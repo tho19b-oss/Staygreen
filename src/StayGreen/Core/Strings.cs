@@ -21,9 +21,6 @@ namespace StayGreen.Core
             new[] { "balloon.tray",
                 "StayGreen läuft im Infobereich weiter. Ein Klick auf das Symbol öffnet das Fenster.",
                 "StayGreen keeps running in the notification area. Click the icon to open the window." },
-            new[] { "balloon.maxruntime",
-                "StayGreen wurde nach {0} automatisch gestoppt (Sicherheitsnetz).",
-                "StayGreen stopped automatically after {0} (safety net)." },
             new[] { "balloon.storage",
                 "Die Einstellungen konnten nicht gespeichert werden: {0}",
                 "Settings could not be saved: {0}" },
@@ -173,11 +170,6 @@ namespace StayGreen.Core
             new[] { "act.teamsonly.hint",
                 "Ist Teams beendet, bleibt StayGreen im Wartezustand und der PC darf in den Standby.",
                 "While Teams is closed, StayGreen waits and the PC may go to standby." },
-            new[] { "act.maxrun", "Sicherheitsnetz: automatisch stoppen nach", "Safety net: stop automatically after" },
-            new[] { "act.maxrun.hint",
-                "Stoppt das Aktivhalten, wenn es so lange am Stück gelaufen ist (falls du vergisst, es auszuschalten). 0 = aus.",
-                "Stops holding once it has been running for this long in a row (in case you forget to switch it off). 0 = off." },
-            new[] { "act.maxrun.unit", "Stunden", "hours" },
             new[] { "act.test", "Jetzt testen", "Test now" },
             new[] { "act.test.title", "Eingabe testen", "Test input" },
             new[] { "act.test.hint",
@@ -215,16 +207,6 @@ namespace StayGreen.Core
             new[] { "sch.none",
                 "Noch kein Zeitfenster angelegt. Der Zeitplan wirkt erst, wenn es mindestens eins gibt.",
                 "No time window yet. The schedule only takes effect once there is at least one." },
-
-            // ---- Karte "Ausnahmen" ----
-            new[] { "exc.grp", "Urlaub und Feiertage", "Vacation and holidays" },
-            new[] { "exc.hint",
-                "An diesen Tagen pausiert StayGreen, auch wenn der Zeitplan sonst aktiv wäre.",
-                "StayGreen pauses on these days even if the schedule would otherwise be active." },
-            new[] { "exc.none", "Keine Ausnahmen eingetragen.", "No exceptions yet." },
-            new[] { "exc.days.one", "1 Tag", "1 day" },
-            new[] { "exc.days.many", "{0} Tage", "{0} days" },
-            new[] { "exc.err.order", "Das Ende darf nicht vor dem Anfang liegen.", "The end must not be before the start." },
 
             // ---- Karte "Auto-Stopp" ----
             new[] { "stop.grp.title", "Feierabend: Auto-Stopp", "End of day: auto-stop" },
@@ -326,8 +308,6 @@ namespace StayGreen.Core
             new[] { "tray.pause.hour", "1 Stunde", "1 hour" },
             new[] { "tray.pause.hours", "{0} Stunden", "{0} hours" },
             new[] { "tray.resume", "Fortsetzen", "Resume" },
-            new[] { "tray.skiptoday", "Heute aussetzen", "Skip today" },
-            new[] { "tray.unskiptoday", "Heute wieder aktivieren", "Re-enable today" },
 
             // ---- Vorwarnung vor dem Auto-Stopp ----
             new[] { "cd.title", "Auto-Stopp in Kürze", "Auto-stop coming up" },
@@ -347,7 +327,6 @@ namespace StayGreen.Core
             new[] { "reason.autostart", "Windows-Autostart", "Windows autostart" },
             new[] { "reason.autostop", "Auto-Stopp", "Auto-stop" },
             new[] { "reason.exit", "Programm beendet", "Program exited" },
-            new[] { "reason.maxruntime", "Maximale Laufzeit erreicht ({0})", "Maximum runtime reached ({0})" },
             new[] { "log.runtime", "Laufzeit {0}", "Runtime {0}" },
             new[] { "log.pause_schedule", "Außerhalb des Zeitfensters, pausiert", "Outside the time window, paused" },
             new[] { "log.pause_manual", "Pausiert bis {0} ({1})", "Paused until {0} ({1})" },

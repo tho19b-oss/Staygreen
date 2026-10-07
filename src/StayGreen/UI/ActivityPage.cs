@@ -5,7 +5,7 @@ using StayGreen.Core;
 
 namespace StayGreen.UI
 {
-    /// <summary>Methode, Intervall, intelligenter Modus, Wach-Halten, Teams-Pruefung und Sicherheitsnetz.</summary>
+    /// <summary>Methode, Intervall, intelligenter Modus, Wach-Halten und Teams-Pruefung.</summary>
     sealed class ActivityPage : PageBase
     {
         readonly Card _methodCard = new Card();
@@ -15,10 +15,8 @@ namespace StayGreen.UI
         readonly ComboBox _key = Style(new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList });
         readonly NumericUpDown _interval = Style(new NumericUpDown { Minimum = Settings.MinInterval, Maximum = Settings.MaxInterval });
         readonly NumericUpDown _pixels = Style(new NumericUpDown { Minimum = Settings.MinMousePixels, Maximum = Settings.MaxMousePixels });
-        readonly NumericUpDown _maxRun = Style(new NumericUpDown { Minimum = 0, Maximum = Settings.MaxRuntimeHoursLimit });
         readonly Label _secondsUnit = CreateLabel();
         readonly Label _pixelsUnit = CreateLabel();
-        readonly Label _hoursUnit = CreateLabel();
         readonly SwitchBox _smart = CreateSwitch();
         readonly SwitchBox _awake = CreateSwitch();
         readonly SwitchBox _teamsOnly = CreateSwitch();
@@ -32,7 +30,6 @@ namespace StayGreen.UI
         readonly SettingRow _smartRow;
         readonly SettingRow _awakeRow;
         readonly SettingRow _teamsRow;
-        readonly SettingRow _maxRunRow;
 
         /// <summary>Wird vom Hauptfenster gesetzt: erzeugt eine Eingabe und meldet, ob Windows sie angenommen und als Aktivitaet gewertet hat.</summary>
         public Func<InputTestResult> TestRequested;
@@ -43,7 +40,6 @@ namespace StayGreen.UI
             _key.Width = Dpi.Px(230);
             _interval.Width = Dpi.Px(76);
             _pixels.Width = Dpi.Px(76);
-            _maxRun.Width = Dpi.Px(76);
 
             _modeRow = new SettingRow(_mode);
             _keyRow = new SettingRow(_key);
@@ -53,7 +49,6 @@ namespace StayGreen.UI
             _smartRow = new SettingRow(_smart);
             _awakeRow = new SettingRow(_awake);
             _teamsRow = new SettingRow(_teamsOnly);
-            _maxRunRow = new SettingRow(new InlineRow(_maxRun, _hoursUnit));
 
             _methodCard.AddRow(_modeRow);
             _methodCard.AddRow(_keyRow);
@@ -63,7 +58,6 @@ namespace StayGreen.UI
             _behaviorCard.AddRow(_smartRow);
             _behaviorCard.AddRow(_awakeRow);
             _behaviorCard.AddRow(_teamsRow);
-            _behaviorCard.AddRow(_maxRunRow);
 
             Controls.Add(_methodCard);
             Controls.Add(_behaviorCard);
@@ -115,12 +109,6 @@ namespace StayGreen.UI
                 S.OnlyWhileTeamsRuns = _teamsOnly.Checked;
                 Fire();
             };
-            _maxRun.ValueChanged += (o, e) =>
-            {
-                if (Loading || S == null) return;
-                S.MaxRuntimeHours = (int)_maxRun.Value;
-                Fire();
-            };
             _test.Click += (o, e) =>
             {
                 InputTestResult result = TestRequested != null ? TestRequested() : InputTestResult.Rejected;
@@ -159,7 +147,6 @@ namespace StayGreen.UI
             _smart.Checked = s.SmartIdle;
             _awake.Checked = s.KeepAwake;
             _teamsOnly.Checked = s.OnlyWhileTeamsRuns;
-            _maxRun.Value = Math.Min(Math.Max(s.MaxRuntimeHours, 0), Settings.MaxRuntimeHoursLimit);
             UpdateEnabled();
             UpdateIntervalHint();
         }
@@ -222,9 +209,6 @@ namespace StayGreen.UI
             _awakeRow.Caption = Loc.T("act.awake.hint");
             _teamsRow.Title = Loc.T("act.teamsonly");
             _teamsRow.Caption = Loc.T("act.teamsonly.hint");
-            _maxRunRow.Title = Loc.T("act.maxrun");
-            _maxRunRow.Caption = Loc.T("act.maxrun.hint");
-            _hoursUnit.Text = Loc.T("act.maxrun.unit");
 
             UpdateIntervalHint();
             RefreshLayout();

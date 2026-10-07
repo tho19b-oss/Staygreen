@@ -73,8 +73,6 @@ namespace StayGreen.Core
         public const int MaxWarnSeconds = 300;
         public const int MinSnoozeMinutes = 1;
         public const int MaxSnoozeMinutes = 120;
-        public const int MaxRuntimeHoursLimit = 48;
-        public const int MaxExceptions = 100;
 
         /// <summary>Tasten, die als globaler Hotkey erlaubt sind: A bis Z und F1 bis F24.</summary>
         public static readonly string[] HotkeyKeys = BuildHotkeyKeys();
@@ -102,9 +100,6 @@ namespace StayGreen.Core
         /// <summary>Nur aktiv halten, solange Teams laeuft (sonst Zustand "wartet auf Teams").</summary>
         public bool OnlyWhileTeamsRuns { get; set; }
 
-        /// <summary>Sicherheitsnetz: nach so vielen Stunden am Stueck automatisch stoppen. 0 = aus.</summary>
-        public int MaxRuntimeHours { get; set; }
-
         // ---- Start und Fenster ----
         public bool StartHoldingOnLaunch { get; set; } = true;
         public bool StartWithWindows { get; set; }
@@ -131,9 +126,6 @@ namespace StayGreen.Core
         // ---- Zeitplan ----
         public bool ScheduleEnabled { get; set; }
         public List<ScheduleRule> Rules { get; } = new List<ScheduleRule>();
-
-        /// <summary>Ausnahmetage (Urlaub, Feiertage): An diesen Tagen beginnt kein Zeitfenster.</summary>
-        public List<DateRange> Exceptions { get; } = new List<DateRange>();
 
         // ---- Auto-Stopp ----
         public bool AutoStopEnabled { get; set; }
@@ -174,12 +166,6 @@ namespace StayGreen.Core
             get { return StopCloseTeams || StopLock || StopShutdown || StopExitApp; }
         }
 
-        /// <summary>Gilt dieser Tag als Ausnahmetag?</summary>
-        public bool IsExcluded(DateTime day)
-        {
-            return DateRange.ContainsDay(Exceptions, day);
-        }
-
         /// <summary>True, wenn ein Intervall so lang ist, dass Teams trotz Aktivhalten "Abwesend" anzeigen kann.</summary>
         public static bool IsIntervalRisky(int seconds)
         {
@@ -191,7 +177,6 @@ namespace StayGreen.Core
         {
             IntervalSeconds = Clamp(IntervalSeconds, MinInterval, MaxInterval);
             MousePixels = Clamp(MousePixels, MinMousePixels, MaxMousePixels);
-            MaxRuntimeHours = Clamp(MaxRuntimeHours, 0, MaxRuntimeHoursLimit);
             AutoStopWarnSeconds = Clamp(AutoStopWarnSeconds, MinWarnSeconds, MaxWarnSeconds);
             AutoStopSnoozeMinutes = Clamp(AutoStopSnoozeMinutes, MinSnoozeMinutes, MaxSnoozeMinutes);
             if (!Enum.IsDefined(typeof(ActivityKey), InputKey)) InputKey = ActivityKey.F15;
@@ -214,7 +199,6 @@ namespace StayGreen.Core
                 AutoStopTime = new TimeSpan(17, 0, 0);
 
             Rules.RemoveAll(r => r == null || !r.IsUsable);
-            DateRange.Normalize(Exceptions);
             LogPath = (LogPath ?? "").Trim();
         }
 
@@ -239,7 +223,6 @@ namespace StayGreen.Core
             Add(sb, "SmartIdle", SmartIdle);
             Add(sb, "KeepAwake", KeepAwake);
             Add(sb, "OnlyWhileTeamsRuns", OnlyWhileTeamsRuns);
-            Add(sb, "MaxRuntimeHours", MaxRuntimeHours);
 
             Add(sb, "StartHoldingOnLaunch", StartHoldingOnLaunch);
             Add(sb, "StartWithWindows", StartWithWindows);
@@ -257,8 +240,6 @@ namespace StayGreen.Core
             Add(sb, "ScheduleEnabled", ScheduleEnabled);
             foreach (ScheduleRule rule in Rules)
                 Add(sb, "Rule", rule.Serialize());
-            foreach (DateRange range in Exceptions)
-                Add(sb, "Exception", range.Serialize());
 
             Add(sb, "AutoStopEnabled", AutoStopEnabled);
             Add(sb, "AutoStopTiming", AutoStopTiming.ToString());
@@ -318,7 +299,6 @@ namespace StayGreen.Core
                 case "smartidle": if (TryBool(value, out b)) SmartIdle = b; break;
                 case "keepawake": if (TryBool(value, out b)) KeepAwake = b; break;
                 case "onlywhileteamsruns": if (TryBool(value, out b)) OnlyWhileTeamsRuns = b; break;
-                case "maxruntimehours": if (TryInt(value, out i)) MaxRuntimeHours = i; break;
 
                 case "startholdingonlaunch": if (TryBool(value, out b)) StartHoldingOnLaunch = b; break;
                 case "startwithwindows": if (TryBool(value, out b)) StartWithWindows = b; break;
@@ -337,10 +317,6 @@ namespace StayGreen.Core
                 case "rule":
                     ScheduleRule rule;
                     if (ScheduleRule.TryParse(value, out rule)) Rules.Add(rule);
-                    break;
-                case "exception":
-                    DateRange range;
-                    if (DateRange.TryParse(value, out range)) Exceptions.Add(range);
                     break;
 
                 case "autostopenabled": if (TryBool(value, out b)) AutoStopEnabled = b; break;

@@ -165,7 +165,7 @@ jobs:
 
           # NoticeAccepted: Der einmalige Hinweis beim ersten Oeffnen soll das Fenster nicht verdecken.
           $base = @('StartHoldingOnLaunch=true', 'NoticeAccepted=true')
-          $schedule = @('ScheduleEnabled=true', 'Rule=1111100;08:00;12:00', 'Rule=1111100;13:00;17:00', 'Exception=2026-12-24;2026-12-31')
+          $schedule = @('ScheduleEnabled=true', 'Rule=1111100;08:00;12:00', 'Rule=1111100;13:00;17:00')
           $autostop = @('AutoStopEnabled=true', 'AutoStopTiming=Daily', 'AutoStopTime=17:00', 'StopCloseTeams=true', 'StopLock=true', 'StopExitApp=true')
           Take-Shot 'de-1-aktivitaet' 'de' $null @() $base $true
           Take-Shot 'de-2-zeitplan' 'de' 'schedule' @() ($base + $schedule) $true

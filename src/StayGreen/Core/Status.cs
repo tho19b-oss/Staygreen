@@ -59,7 +59,7 @@ namespace StayGreen.Core
             {
                 info.Kind = StatusKind.WaitingForWindow;
                 info.Title = Loc.T("status.waiting");
-                DateTime? next = Scheduler.NextChange(now, settings.Rules, settings.Exceptions);
+                DateTime? next = Scheduler.NextChange(now, settings.Rules);
                 info.Detail = next.HasValue
                     ? Loc.T("status.waiting.detail", When(next.Value, now))
                     : Loc.T("status.waiting.detail.none");
@@ -111,8 +111,8 @@ namespace StayGreen.Core
         public static string ScheduleLine(Settings settings, DateTime now)
         {
             if (!settings.ScheduleActive) return null;
-            bool inside = Scheduler.IsActive(now, settings.Rules, settings.Exceptions);
-            DateTime? next = Scheduler.NextChange(now, settings.Rules, settings.Exceptions);
+            bool inside = Scheduler.IsActive(now, settings.Rules);
+            DateTime? next = Scheduler.NextChange(now, settings.Rules);
             if (next.HasValue)
                 return Loc.T(inside ? "plan.schedule.until" : "plan.schedule.from", When(next.Value, now));
             return Loc.T(inside ? "plan.schedule.always" : "plan.schedule.never");
@@ -199,22 +199,6 @@ namespace StayGreen.Core
             string text = Days(rule.Days) + "   " + ScheduleRule.FormatTime(rule.Start) + " – " + ScheduleRule.FormatTime(rule.End);
             if (rule.CrossesMidnight) text += "  " + Loc.T("rule.overnight");
             return text;
-        }
-
-        /// <summary>"24.12.2026 – 02.01.2027  (10 Tage)" bzw. englisch "Dec 24, 2026 – Jan 2, 2027  (10 days)".</summary>
-        public static string Describe(DateRange range)
-        {
-            string text = Date(range.From);
-            if (range.To.Date != range.From.Date) text += " – " + Date(range.To);
-            int days = range.DayCount;
-            return text + "  (" + (days == 1 ? Loc.T("exc.days.one") : Loc.T("exc.days.many", days)) + ")";
-        }
-
-        static string Date(DateTime day)
-        {
-            return Loc.Language == "en"
-                ? day.ToString("MMM d, yyyy", CultureInfo.InvariantCulture)
-                : day.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture);
         }
     }
 
